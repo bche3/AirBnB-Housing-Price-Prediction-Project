@@ -5,7 +5,9 @@ author: "Brian Che"
 date: "2022-11-19"
 output:
   html_document:
+    code_folding: show
     toc: true
+    toc_float: true
     theme: united
 ---
 
@@ -15,21 +17,23 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Introduction
 
-Text
+Los Angeles listings.csv <http://insideairbnb.com/get-the-data/>
 
-```{r,warning=FALSE,message=FALSE}
+```{r,warning=FALSE,message=FALSE, class.source = 'fold-hide'}
 # load libraries
 library(tidyverse)
 library(tidymodels)
 ```
 
 ```{r}
-print("Hello")
+# read in data
+data <- read_csv("data/listings.csv") 
+
 ```
 
 ## Exploratory Data Analysis
 
-Text
+<https://www.kaggle.com/code/upadorprofzs/understand-your-data-airbnb-reservations>
 
 ## Data Splitting & Cross-validation
 
@@ -46,3 +50,35 @@ Text
 ## Conclusion
 
 Text
+
+=======
+
+## References
+
+### Tabset Reference {.tabset}
+
+#### Test 1
+
+Text 1
+
+#### Test 2
+
+Text 2
+
+#### Test 3
+
+Text 3
+
+### Chunk code-fold show / code-fold hide
+
+```{r,warning=FALSE,message=FALSE, class.source = 'fold-hide'}
+# load libraries
+library(tidyverse)
+library(tidymodels)
+```
+
+```{r,warning=FALSE,message=FALSE, class.source = 'fold-show'}
+# load libraries
+library(tidyverse)
+library(tidymodels)
+```
