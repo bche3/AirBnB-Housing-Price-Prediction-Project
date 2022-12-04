@@ -1,0 +1,48 @@
+---
+title: "PSTAT 131 Final Project Report"
+subtitle: "AirBNB Price Prediction"
+author: "Brian Che"
+date: "2022-11-19"
+output:
+  html_document:
+    toc: true
+    theme: united
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+Text
+
+```{r,warning=FALSE,message=FALSE}
+# load libraries
+library(tidyverse)
+library(tidymodels)
+```
+
+```{r}
+print("Hello")
+```
+
+## Exploratory Data Analysis
+
+Text
+
+## Data Splitting & Cross-validation
+
+Text
+
+## Model Fitting
+
+Text
+
+## Model Selection & Performance
+
+Text
+
+## Conclusion
+
+Text
