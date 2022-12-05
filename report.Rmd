@@ -19,6 +19,13 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Introduction
 
+Describes the data, the research questions, provides any background readers need to understand your project, etc.
+
+Quarterly data for the last year for each region is available for free download on this page
+Inside Airbnb is a mission driven project that provides data and advocacy about Airbnb's impact on residential communities.
+
+We work towards a vision where data and information empower communities to understand, decide and control the role of renting residential homes to tourists.
+
 Los Angeles listings.csv <http://insideairbnb.com/get-the-data/>
 
 ```{r,warning=FALSE,message=FALSE, class.source = 'fold-hide'}
@@ -29,9 +36,13 @@ library(tidymodels)
 
 ```{r}
 # read in data
-data <- read_csv("data/listings.csv") 
+data <- read_csv("data/unprocessed/listings.csv") 
 glimpse(data)
+structure(data)
+```
 
+
+```{r}
 NAnalysis <- data %>% 
   group_by(neighbourhood_group) %>% summarise(Mean_Price = mean(price))
 
@@ -44,23 +55,25 @@ ggplot(NAnalysis, aes(x = reorder(neighbourhood_group, -Mean_Price), y = Mean_Pr
 
 ## Exploratory Data Analysis
 
+This should contain at least 3 to 5 visualizations and/or tables and their interpretation/discussion. At minimum your group should create a univariate visualization of the outcome(s), a bi-variate or multivariate visualization of the relationship(s) between the outcome and select predictors, etc. Part of an EDA involves asking questions about your data and exploring your data to find the answers.
+
 <https://www.kaggle.com/code/upadorprofzs/understand-your-data-airbnb-reservations>
 
 ## Data Splitting & Cross-validation
 
-Text
+Describe your process of splitting data into training, test, and/or validation sets. Describe the process of cross-validation.
 
 ## Model Fitting
 
-Text
+Describe the types of models you fit, their parameter values, and the results.
 
 ## Model Selection & Performance
 
-Text
+ A table and/or graph describing the performance of your best-fitting model on testing data. Describe your best-fitting model however you choose, and the quality of its predictions, etc.
 
 ## Conclusion
 
-Text
+Discusses the outcome(s) of models you fit. Which models performed well, which performed poorly? Were you surprised by model performance? Next steps? General conclusions?
 
 =======
 
