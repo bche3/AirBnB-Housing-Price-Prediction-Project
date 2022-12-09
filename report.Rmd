@@ -1,8 +1,8 @@
 ---
-title: "PSTAT 131 Final Project Report"
-subtitle: "AirBNB Price Prediction"
+title: "AirBNB L.A. Price Prediction"
+subtitle: "UCSB PSTAT 131 Final Project"
 author: "Brian Che"
-date: "2022-11-19"
+date: "Fall 2022"
 output:
   html_document:
     code_folding: show
@@ -36,11 +36,21 @@ library(tidymodels)
 
 ```{r}
 # read in data
-data <- read_csv("data/unprocessed/listings.csv") 
-glimpse(data)
-structure(data)
-```
+data <- read_csv("data/unprocessed/listings.csv")
 
+data %>% glimpse()
+
+# price ~ neighbourhood(dummies) + minimum_nights + room_type(dummies) + number of reviews + reviews_per_month + calculated_host_listings_count + availability_365
+data %>% filter(price == 0)
+
+data %>% filter(!is.na(license))
+
+data %>% select(neighbourhood) %>% table()
+data %>% select(neighbourhood_group) %>% table()
+
+
+```
+For sake of faster runtime, we wil 
 
 ```{r}
 NAnalysis <- data %>% 
