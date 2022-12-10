@@ -1,10 +1,13 @@
 library(tidyverse)
 
 data <- read_csv("data/unprocessed/listings.csv") %>%
+  rename(host_listings_count = calculated_host_listings_count) %>%
   # remove the 14 rows with price equal to 0 because a listing price of 0 can't be possible
   filter(price != 0) %>%
   filter(availability_365 != 0) %>%
   select(-id, -name, -host_id, -host_name, -last_review, -license)
+
+glimpse(data)
 
 set.seed(2022)
 data <- data[sample(nrow(data), size=15000), ]
