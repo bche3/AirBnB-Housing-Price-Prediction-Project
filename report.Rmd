@@ -33,21 +33,18 @@ Los Angeles listings.csv <http://insideairbnb.com/get-the-data/>
 library(tidyverse)
 library(tidymodels)
 library(yardstick)
+library(corrplot)
 ```
 
 ```{r}
 # read in data
-data <- read_csv("data/unprocessed/listings.csv")
+airbnb <- read_csv("data/unprocessed/listings.csv")
 
-data %>% glimpse()
+airbnb %>% glimpse()
 
 # price ~ neighbourhood(dummies) + minimum_nights + room_type(dummies) + number of reviews + reviews_per_month + calculated_host_listings_count + availability_365
-data %>% filter(price == 0)
-
-data %>% filter(!is.na(license))
-
-data %>% select(neighbourhood) %>% table()
-data %>% select(neighbourhood_group) %>% table()
+  
+airbnb %>% select(neighbourhood_group) %>% table()
 
 
 ```
@@ -96,94 +93,94 @@ Describe your process of splitting data into training, test, and/or validation s
 # recipe(price ~ .) %>%
 #   step_dummy(all_nominal_predictors()) %>% 
 #   step_normalize(all_predictors())
-
-reg_tree_spec <- tree_spec %>%
-  set_mode("regression")
-  
-reg_tree_fit <- fit(reg_tree_spec, 
-                    sale_price ~ . -ms_sub_class -ms_zoning, ames_train)
-
-augment(reg_tree_fit, new_data = ames_test) %>%
-  rmse(truth = sale_price, estimate = .pred)
-
-reg_tree_fit %>%
-  extract_fit_engine() %>%
-  rpart.plot()
-
-reg_tree_wf <- workflow() %>%
-  add_model(reg_tree_spec %>% set_args(cost_complexity = tune())) %>%
-  add_formula(sale_price ~ .)
-
-set.seed(3435)
-ames_fold <- vfold_cv(ames_train)
-
-param_grid <- grid_regular(cost_complexity(range = c(-4, -1)), levels = 10)
-
-tune_res <- tune_grid(
-  reg_tree_wf, 
-  resamples = ames_fold, 
-  grid = param_grid
-)
-
-autoplot(tune_res)
-
-best_complexity <- select_best(tune_res, metric = "rmse")
-
-reg_tree_final <- finalize_workflow(reg_tree_wf, best_complexity)
-
-reg_tree_final_fit <- fit(reg_tree_final, data = ames_train)
-
-reg_tree_final_fit %>%
-  extract_fit_engine() %>%
-  rpart.plot()
-
-augment(reg_tree_final_fit, new_data = ames_test) %>%
-  rmse(truth = sale_price, estimate = .pred)
-
-###
-
-bagging_spec <- rand_forest(mtry = .cols()) %>%
-  set_engine("randomForest", importance = TRUE) %>%
-  set_mode("regression")
-
-bagging_fit <- fit(bagging_spec, sale_price ~ ., 
-                   data = ames_train)
-
-augment(bagging_fit, new_data = ames_test) %>%
-  rmse(truth = sale_price, estimate = .pred)
-
-augment(bagging_fit, new_data = ames_test) %>%
-  ggplot(aes(sale_price, .pred)) +
-  geom_abline() +
-  geom_point(alpha = 0.5)
-
-vip(bagging_fit)
-
-rf_spec <- rand_forest(mtry = 6) %>%
-  set_engine("randomForest", importance = TRUE) %>%
-  set_mode("regression")
-
-rf_fit <- fit(rf_spec, sale_price ~ ., data = ames_train)
-
-augment(rf_fit, new_data = ames_train) %>%
-  rmse(truth = sale_price, estimate = .pred)
-
-augment(rf_fit, new_data = ames_test) %>%
-  ggplot(aes(sale_price, .pred)) +
-  geom_abline() +
-  geom_point(alpha = 0.5)
-
-vip(rf_fit)
-
-### 
-boost_spec <- boost_tree(trees = 5000, tree_depth = 4) %>%
-  set_engine("xgboost") %>%
-  set_mode("regression")
-
-boost_fit <- fit(boost_spec, sale_price ~ ., data = ames_train)
-
-augment(boost_fit, new_data = ames_test) %>%
-  rmse(truth = sale_price, estimate = .pred)
+# 
+# reg_tree_spec <- tree_spec %>%
+#   set_mode("regression")
+#   
+# reg_tree_fit <- fit(reg_tree_spec, 
+#                     sale_price ~ . -ms_sub_class -ms_zoning, ames_train)
+# 
+# augment(reg_tree_fit, new_data = ames_test) %>%
+#   rmse(truth = sale_price, estimate = .pred)
+# 
+# reg_tree_fit %>%
+#   extract_fit_engine() %>%
+#   rpart.plot()
+# 
+# reg_tree_wf <- workflow() %>%
+#   add_model(reg_tree_spec %>% set_args(cost_complexity = tune())) %>%
+#   add_formula(sale_price ~ .)
+# 
+# set.seed(3435)
+# ames_fold <- vfold_cv(ames_train)
+# 
+# param_grid <- grid_regular(cost_complexity(range = c(-4, -1)), levels = 10)
+# 
+# tune_res <- tune_grid(
+#   reg_tree_wf, 
+#   resamples = ames_fold, 
+#   grid = param_grid
+# )
+# 
+# autoplot(tune_res)
+# 
+# best_complexity <- select_best(tune_res, metric = "rmse")
+# 
+# reg_tree_final <- finalize_workflow(reg_tree_wf, best_complexity)
+# 
+# reg_tree_final_fit <- fit(reg_tree_final, data = ames_train)
+# 
+# reg_tree_final_fit %>%
+#   extract_fit_engine() %>%
+#   rpart.plot()
+# 
+# augment(reg_tree_final_fit, new_data = ames_test) %>%
+#   rmse(truth = sale_price, estimate = .pred)
+# 
+# ###
+# 
+# bagging_spec <- rand_forest(mtry = .cols()) %>%
+#   set_engine("randomForest", importance = TRUE) %>%
+#   set_mode("regression")
+# 
+# bagging_fit <- fit(bagging_spec, sale_price ~ ., 
+#                    data = ames_train)
+# 
+# augment(bagging_fit, new_data = ames_test) %>%
+#   rmse(truth = sale_price, estimate = .pred)
+# 
+# augment(bagging_fit, new_data = ames_test) %>%
+#   ggplot(aes(sale_price, .pred)) +
+#   geom_abline() +
+#   geom_point(alpha = 0.5)
+# 
+# vip(bagging_fit)
+# 
+# rf_spec <- rand_forest(mtry = 6) %>%
+#   set_engine("randomForest", importance = TRUE) %>%
+#   set_mode("regression")
+# 
+# rf_fit <- fit(rf_spec, sale_price ~ ., data = ames_train)
+# 
+# augment(rf_fit, new_data = ames_train) %>%
+#   rmse(truth = sale_price, estimate = .pred)
+# 
+# augment(rf_fit, new_data = ames_test) %>%
+#   ggplot(aes(sale_price, .pred)) +
+#   geom_abline() +
+#   geom_point(alpha = 0.5)
+# 
+# vip(rf_fit)
+# 
+# ### 
+# boost_spec <- boost_tree(trees = 5000, tree_depth = 4) %>%
+#   set_engine("xgboost") %>%
+#   set_mode("regression")
+# 
+# boost_fit <- fit(boost_spec, sale_price ~ ., data = ames_train)
+# 
+# augment(boost_fit, new_data = ames_test) %>%
+#   rmse(truth = sale_price, estimate = .pred)
 ```
 
 ```{r}
