@@ -43,9 +43,6 @@ airbnb <- read_csv("data/unprocessed/listings.csv")
 airbnb %>% glimpse()
 
 # price ~ neighbourhood(dummies) + minimum_nights + room_type(dummies) + number of reviews + reviews_per_month + calculated_host_listings_count + availability_365
-  
-airbnb %>% select(neighbourhood_group) %>% table()
-
 
 ```
 For sake of faster runtime, we wil 
