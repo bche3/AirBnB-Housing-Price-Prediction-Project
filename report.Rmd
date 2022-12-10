@@ -72,22 +72,38 @@ airbnb <- airbnb %>%
 
 set.seed(2022)
 airbnb <- airbnb[sample(nrow(airbnb), size=15000), ]
+```
+
+
+
+```{r}
+airbnb %>%
+  summary()
 
 # include use="pairwise.complete.obs" to exclude NAs
 corrplot(cor(Filter(is.numeric, airbnb)), method = 'color', )
 
 # drop neighbourhood, latitude, longitude,
 # drop number_of_reviews_ltm and reviews_per_month for being highly correlated with number_of_reviews
-airbnb <- airbnb %>%
+airbnb_clean <- airbnb %>%
   select(-neighbourhood, -latitude, -longitude, -number_of_reviews_ltm, -reviews_per_month)
+```
 
-corrplot(cor(Filter(is.numeric, airbnb)), method = 'color')
+
+```{r}
+write_rds(airbnb_clean, "data/processed/airbnb_clean.rds")
+
+# load("/data/processed/airbnb_clean.rds")
+```
+
+```{r}
+corrplot(cor(Filter(is.numeric, airbnb_clean)), method = 'color')
 
 ```
 For sake of faster runtime, we wil 
 
 ```{r}
-NAnalysis <- airbnb %>% 
+NAnalysis <- airbnb_clean %>% 
   group_by(neighbourhood_group) %>% summarise(Mean_Price = mean(price))
 
 ggplot(NAnalysis, aes(x = reorder(neighbourhood_group, -Mean_Price), y = Mean_Price, fill=neighbourhood_group)) + 
@@ -100,7 +116,7 @@ ggplot(NAnalysis, aes(x = reorder(neighbourhood_group, -Mean_Price), y = Mean_Pr
 
 ```{r}
 # use corrplot to make correlation of cont vars
-corrplot(cor(Filter(is.numeric,airbnb)), method = 'color')
+corrplot(cor(Filter(is.numeric,airbnb_clean)), method = 'color')
 ```
 
 ## Data Splitting & Cross-validation
@@ -108,26 +124,69 @@ corrplot(cor(Filter(is.numeric,airbnb)), method = 'color')
 - Describe your process of splitting data into training, test, and/or validation sets. 
 
 ```{r}
-# set.seed(2022)
-# Auto_split <- initial_split(Auto, strata = mpg, prop = 0.7)
-# airbnb_split <- initial_split(airbnb, strata = price, prop = 0. 8)
-# airbnb_split
-# 
-# airbnb_train <- training(airbnb_split)
-# airbnb_test <- testing(airbnb_split)
-# 
-# dim(airbnb_train)
-# dim(airbnb_test)
+set.seed(2022)
+airbnb_split <- airbnb_clean %>% initial_split(strata = price, prop = 0.8)
+airbnb_split
+
+airbnb_train <- training(airbnb_split)
+airbnb_test <- testing(airbnb_split)
+
+dim(airbnb_train)
+dim(airbnb_test)
+```
+```{r}
+airbnb_train %>%
+  summary()
 ```
 
+
 - Describe the process of cross-validation.
+
+### Cross Validation Folding on Training
 ```{r}
-# airbnb_fold <- vfold_cv(airbnb_train, v = 10)
+airbnb_fold <- vfold_cv(airbnb_train, v = 10, strata = price)
+```
+
+```{r}
+# save()
 ```
 
 ## Model Fitting
 
 - Describe the types of models you fit, their parameter values, and the results.
+
+### Recipe Building
+
+```{r}
+airbnb_recipe <- recipe(price ~ ., data = airbnb_train) %>%
+  step_dummy(all_nominal_predictors()) %>% 
+  step_normalize(all_predictors())
+  # step_center(all_predictors()) %>% 
+  # step_scale(all_predictors())
+```
+
+### Linear Regression Model
+
+```{r}
+lm_model <- linear_reg() %>% 
+  set_engine("lm")
+
+lm_wf <- workflow() %>% 
+  add_recipe(airbnb_recipe) %>% 
+  add_model(lm_model)
+```
+
+### Random Forest Model
+
+### K Nearest Neighbours Model
+
+### SVM Model
+
+### Ridge Regression Model
+
+### Lasso Regression Model
+
+
 
 ```{r}
 # price ~ neighbourhood(dummies) + minimum_nights + room_type(dummies) + number of reviews + reviews_per_month + calculated_host_listings_count + availability_365
@@ -225,6 +284,8 @@ corrplot(cor(Filter(is.numeric,airbnb)), method = 'color')
 # augment(boost_fit, new_data = ames_test) %>%
 #   rmse(truth = sale_price, estimate = .pred)
 ```
+
+
 
 ## Model Selection & Performance
 
