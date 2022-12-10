@@ -155,6 +155,13 @@ airbnb_fold <- vfold_cv(airbnb_train, v = 10, strata = price)
 
 - Describe the types of models you fit, their parameter values, and the results.
 
+
+Tune for: 
+  Random Forest Model, K Nearest Neighbors Model, Boosted Tree, ? SVM Model
+
+Don't tune for:
+  Ridge Regression Model, Lasso Regression Model
+
 ### Recipe Building
 
 ```{r}
@@ -165,28 +172,71 @@ airbnb_recipe <- recipe(price ~ ., data = airbnb_train) %>%
   # step_scale(all_predictors())
 ```
 
-### Linear Regression Model
+### Linear Regression Model (Remove later)
 
 ```{r}
 lm_model <- linear_reg() %>% 
   set_engine("lm")
 
-lm_wf <- workflow() %>% 
+lm_workflow <- workflow() %>% 
   add_recipe(airbnb_recipe) %>% 
   add_model(lm_model)
+
+airbnb_fit <- fit(lm_workflow, airbnb_train)
 ```
 
 ### Random Forest Model
 
+```{r}
+set.seed(2022)
+rf_mod <- rand_forest(mtry = tune(), trees = tune(), min_n = tune()) %>%
+  set_engine("ranger", importance = "impurity") %>%
+  set_mode("regression")
+
+rf_wf <- workflow() %>%
+  add_recipe(airbnb_recipe) %>%
+  add_model(rf_mod)
+
+param_grid <- grid_regular(mtry(range = c(6,28)), 
+                     trees(range = c(2, 5)), 
+                     min_n(), levels = c(10,10,10))
+
+tune_res_rf <- tune_grid(
+  rf_wf, 
+  resamples = airbnb_fold, 
+  grid = param_grid,
+)
+```
+
 ### K Nearest Neighbours Model
+
+```{r}
+
+```
 
 ### SVM Model
 
+```{r}
+
+```
+
+### Boosted Tree
+
+```{r}
+
+```
+
 ### Ridge Regression Model
+
+```{r}
+
+```
 
 ### Lasso Regression Model
 
+```{r}
 
+```
 
 ```{r}
 # price ~ neighbourhood(dummies) + minimum_nights + room_type(dummies) + number of reviews + reviews_per_month + calculated_host_listings_count + availability_365
