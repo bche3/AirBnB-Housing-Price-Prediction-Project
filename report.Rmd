@@ -19,7 +19,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Introduction
 
-Describes the data, the research questions, provides any background readers need to understand your project, etc.
+- Describes the data, the research questions, provides any background readers need to understand your project, etc.
 
 Quarterly data for the last year for each region is available for free download on this page
 Inside Airbnb is a mission driven project that provides data and advocacy about Airbnb's impact on residential communities.
@@ -28,19 +28,35 @@ We work towards a vision where data and information empower communities to under
 
 Los Angeles listings.csv <http://insideairbnb.com/get-the-data/>
 
+
+### Load libraries and data
 ```{r,warning=FALSE,message=FALSE, class.source = 'fold-hide'}
 # load libraries
 library(tidyverse)
 library(tidymodels)
 library(yardstick)
 library(corrplot)
+
+# read in data
+airbnb <- read_csv("data/unprocessed/listings.csv")
+```
+
+
+## Exploratory Data Analysis
+
+- at least 3 to 5 visualizations and/or tables and their interpretation/discussion
+- create a univariate visualization of the outcome(s)
+- create a bi-variate or multivariate visualization of the relationship(s) between the outcome and select predictors, etc
+- Part of an EDA involves asking questions about your data and exploring your data to find the answers.
+
+<https://www.kaggle.com/code/upadorprofzs/understand-your-data-airbnb-reservations>
+
+### Data Cleaning
+```{r}
+airbnb %>% glimpse()
 ```
 
 ```{r}
-# read in data
-airbnb <- read_csv("data/unprocessed/listings.csv") %>% 
-  glimpse()
-
 sapply(airbnb, function(x) sum(is.na(x)))
 
 airbnb$reviews_per_month[is.na(airbnb$reviews_per_month)] <- 0
@@ -81,11 +97,6 @@ ggplot(NAnalysis, aes(x = reorder(neighbourhood_group, -Mean_Price), y = Mean_Pr
         plot.subtitle = element_text(hjust = 0.5), legend.position = c(0.8, 0.5)) + xlab("") + ylab("Mean Price")
 ```
 
-## Exploratory Data Analysis
-
-This should contain at least 3 to 5 visualizations and/or tables and their interpretation/discussion. At minimum your group should create a univariate visualization of the outcome(s), a bi-variate or multivariate visualization of the relationship(s) between the outcome and select predictors, etc. Part of an EDA involves asking questions about your data and exploring your data to find the answers.
-
-<https://www.kaggle.com/code/upadorprofzs/understand-your-data-airbnb-reservations>
 
 ```{r}
 # use corrplot to make correlation of cont vars
@@ -94,7 +105,7 @@ corrplot(cor(Filter(is.numeric,airbnb)), method = 'color')
 
 ## Data Splitting & Cross-validation
 
-Describe your process of splitting data into training, test, and/or validation sets. Describe the process of cross-validation.
+- Describe your process of splitting data into training, test, and/or validation sets. 
 
 ```{r}
 # set.seed(2022)
@@ -107,40 +118,16 @@ Describe your process of splitting data into training, test, and/or validation s
 # 
 # dim(airbnb_train)
 # dim(airbnb_test)
-# 
-# airbnb_fold <- vfold_cv(airbnb_train, v = 10)
 ```
 
+- Describe the process of cross-validation.
 ```{r}
-# library(tidymodels)
-# library(ISLR)
-# library(ISLR2)
-# library(tidyverse)
-# library(glmnet)
-# library(janitor)
-# tidymodels_prefer()
-# 
-# 
-# Hitters <- as_tibble(Hitters) %>%
-#   filter(!is.na(Salary))
-# 
-# Hitters
-# 
-# Hitters %>% select(Division) %>% table()
-# 
-# Hitters %>% select(League) %>% table()
-# 
-# data(ames, package = "modeldata")
-# 
-# ames <- as_tibble(ames) %>% 
-#   clean_names()
-# 
-# ames
+# airbnb_fold <- vfold_cv(airbnb_train, v = 10)
 ```
 
 ## Model Fitting
 
-Describe the types of models you fit, their parameter values, and the results.
+- Describe the types of models you fit, their parameter values, and the results.
 
 ```{r}
 # price ~ neighbourhood(dummies) + minimum_nights + room_type(dummies) + number of reviews + reviews_per_month + calculated_host_listings_count + availability_365
@@ -241,11 +228,16 @@ Describe the types of models you fit, their parameter values, and the results.
 
 ## Model Selection & Performance
 
- A table and/or graph describing the performance of your best-fitting model on testing data. Describe your best-fitting model however you choose, and the quality of its predictions, etc.
+- A table and/or graph describing the performance of your best-fitting model on testing data. 
+- Describe your best-fitting model however you choose, and the quality of its predictions, etc.
 
 ## Conclusion
 
-Discusses the outcome(s) of models you fit. Which models performed well, which performed poorly? Were you surprised by model performance? Next steps? General conclusions?
+- Discusses the outcome(s) of models you fit. 
+- Which models performed well, which performed poorly? 
+- Were you surprised by model performance? 
+- Next steps? 
+- General conclusions?
 
 
 
@@ -256,6 +248,34 @@ Discusses the outcome(s) of models you fit. Which models performed well, which p
 =======
 
 ## References
+
+```{r}
+# library(tidymodels)
+# library(ISLR)
+# library(ISLR2)
+# library(tidyverse)
+# library(glmnet)
+# library(janitor)
+# tidymodels_prefer()
+# 
+# 
+# Hitters <- as_tibble(Hitters) %>%
+#   filter(!is.na(Salary))
+# 
+# Hitters
+# 
+# Hitters %>% select(Division) %>% table()
+# 
+# Hitters %>% select(League) %>% table()
+# 
+# data(ames, package = "modeldata")
+# 
+# ames <- as_tibble(ames) %>% 
+#   clean_names()
+# 
+# ames
+```
+
 
 ### Tabset Reference {.tabset}
 
