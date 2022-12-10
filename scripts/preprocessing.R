@@ -1,11 +1,15 @@
 library(tidyverse)
+library(corrplot)
 
 data <- read_csv("data/unprocessed/listings.csv") %>%
+  glimpse()
+
+data <- data %>%
   rename(host_listings_count = calculated_host_listings_count) %>%
   # remove the 14 rows with price equal to 0 because a listing price of 0 can't be possible
   filter(price != 0) %>%
   filter(availability_365 != 0) %>%
-  filter(neighbourhood_group != 0) %>%
+  filter(!is.na(neighbourhood_group)) %>%
   select(-id, -name, -host_id, -host_name, -last_review, -license)
 
 glimpse(data)
@@ -43,8 +47,9 @@ data %>% filter(is.na(neighbourhood_group))
 NAnalysis <- data %>% 
   group_by(neighbourhood_group) %>% summarise(Mean_Price = mean(price))
 
-ggplot(NAnalysis, aes(x = reorder(neighbourhood_group, -Mean_Price), y = Mean_Price)) + 
-  geom_bar(stat="identity",colour="black", fill = "tomato3") + 
+
+ggplot(NAnalysis, aes(x = reorder(neighbourhood_group, -Mean_Price), y = Mean_Price, fill=neighbourhood_group)) + 
+  geom_bar(stat="identity", show.legend = FALSE) + 
   labs(title="Average Price of Rooms in each Neighbourhood Group") + 
   theme(plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5), legend.position = c(0.8, 0.5)) + xlab("") + ylab("Mean Price")

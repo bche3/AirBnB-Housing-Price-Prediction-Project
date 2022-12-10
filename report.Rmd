@@ -38,11 +38,34 @@ library(corrplot)
 
 ```{r}
 # read in data
-airbnb <- read_csv("data/unprocessed/listings.csv")
+airbnb <- read_csv("data/unprocessed/listings.csv") %>% 
+  glimpse()
 
-airbnb %>% glimpse()
+sapply(airbnb, function(x) sum(is.na(x)))
 
-# price ~ neighbourhood(dummies) + minimum_nights + room_type(dummies) + number of reviews + reviews_per_month + calculated_host_listings_count + availability_365
+airbnb$reviews_per_month[is.na(airbnb$reviews_per_month)] <- 0
+
+airbnb <- airbnb %>%
+  rename(host_listings_count = calculated_host_listings_count) %>%
+  # remove the 14 rows with price equal to 0 because a listing price of 0 can't be possible
+  filter(price != 0) %>%
+  filter(availability_365 != 0) %>%
+  filter(!is.na(neighbourhood_group)) %>%
+  select(-id, -name, -host_id, -host_name, -last_review, -license) %>%
+  glimpse()
+
+set.seed(2022)
+airbnb <- airbnb[sample(nrow(airbnb), size=15000), ]
+
+# include use="pairwise.complete.obs" to exclude NAs
+corrplot(cor(Filter(is.numeric, airbnb)), method = 'color', )
+
+# drop neighbourhood, latitude, longitude,
+# drop number_of_reviews_ltm and reviews_per_month for being highly correlated with number_of_reviews
+airbnb <- airbnb %>%
+  select(-neighbourhood, -latitude, -longitude, -number_of_reviews_ltm, -reviews_per_month)
+
+corrplot(cor(Filter(is.numeric, airbnb)), method = 'color')
 
 ```
 For sake of faster runtime, we wil 
@@ -51,8 +74,8 @@ For sake of faster runtime, we wil
 NAnalysis <- airbnb %>% 
   group_by(neighbourhood_group) %>% summarise(Mean_Price = mean(price))
 
-ggplot(NAnalysis, aes(x = reorder(neighbourhood_group, -Mean_Price), y = Mean_Price)) + 
-  geom_bar(stat="identity",colour="black", fill = "tomato3") + 
+ggplot(NAnalysis, aes(x = reorder(neighbourhood_group, -Mean_Price), y = Mean_Price, fill=neighbourhood_group)) + 
+  geom_bar(stat="identity", show.legend = FALSE) + 
   labs(title="Average Price of Rooms in each Neighbourhood Group") + 
   theme(plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5), legend.position = c(0.8, 0.5)) + xlab("") + ylab("Mean Price")
@@ -86,6 +109,42 @@ Describe your process of splitting data into training, test, and/or validation s
 # dim(airbnb_test)
 # 
 # airbnb_fold <- vfold_cv(airbnb_train, v = 10)
+```
+
+```{r}
+# library(tidymodels)
+# library(ISLR)
+# library(ISLR2)
+# library(tidyverse)
+# library(glmnet)
+# library(janitor)
+# tidymodels_prefer()
+# 
+# 
+# Hitters <- as_tibble(Hitters) %>%
+#   filter(!is.na(Salary))
+# 
+# Hitters
+# 
+# Hitters %>% select(Division) %>% table()
+# 
+# Hitters %>% select(League) %>% table()
+# 
+# data(ames, package = "modeldata")
+# 
+# ames <- as_tibble(ames) %>% 
+#   clean_names()
+# 
+# ames
+```
+
+## Model Fitting
+
+Describe the types of models you fit, their parameter values, and the results.
+
+```{r}
+# price ~ neighbourhood(dummies) + minimum_nights + room_type(dummies) + number of reviews + reviews_per_month + calculated_host_listings_count + availability_365
+
 
 # recipe(price ~ .) %>%
 #   step_dummy(all_nominal_predictors()) %>% 
@@ -180,37 +239,6 @@ Describe your process of splitting data into training, test, and/or validation s
 #   rmse(truth = sale_price, estimate = .pred)
 ```
 
-```{r}
-library(tidymodels)
-library(ISLR)
-library(ISLR2)
-library(tidyverse)
-library(glmnet)
-library(janitor)
-tidymodels_prefer()
-
-
-Hitters <- as_tibble(Hitters) %>%
-  filter(!is.na(Salary))
-
-Hitters
-
-Hitters %>% select(Division) %>% table()
-
-Hitters %>% select(League) %>% table()
-
-data(ames, package = "modeldata")
-
-ames <- as_tibble(ames) %>% 
-  clean_names()
-
-ames
-```
-
-## Model Fitting
-
-Describe the types of models you fit, their parameter values, and the results.
-
 ## Model Selection & Performance
 
  A table and/or graph describing the performance of your best-fitting model on testing data. Describe your best-fitting model however you choose, and the quality of its predictions, etc.
@@ -218,6 +246,12 @@ Describe the types of models you fit, their parameter values, and the results.
 ## Conclusion
 
 Discusses the outcome(s) of models you fit. Which models performed well, which performed poorly? Were you surprised by model performance? Next steps? General conclusions?
+
+
+
+
+
+
 
 =======
 
