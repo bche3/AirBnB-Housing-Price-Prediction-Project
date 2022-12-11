@@ -1608,6 +1608,11 @@ library(tidyverse)
 library(tidymodels)
 library(yardstick)
 library(corrplot)
+library(randomForest)
+library(xgboost)
+library(vip)
+library(rpart.plot)
+library(ranger)
 
 # read in data
 airbnb &lt;- read_csv(&quot;data/unprocessed/listings.csv&quot;)</code></pre>
@@ -1792,6 +1797,9 @@ dim(airbnb_train)</code></pre>
 <li>Describe the types of models you fit, their parameter values, and
 the results.</li>
 </ul>
+<p>Tune for: Random Forest Model, K Nearest Neighbors Model, Boosted
+Tree, ? SVM Model</p>
+<p>Don’t tune for: Ridge Regression Model, Lasso Regression Model</p>
 <div id="recipe-building" class="section level3">
 <h3>Recipe Building</h3>
 <pre class="r"><code>airbnb_recipe &lt;- recipe(price ~ ., data = airbnb_train) %&gt;%
@@ -1800,23 +1808,35 @@ the results.</li>
   # step_center(all_predictors()) %&gt;% 
   # step_scale(all_predictors())</code></pre>
 </div>
-<div id="linear-regression-model" class="section level3">
-<h3>Linear Regression Model</h3>
-<pre class="r"><code>lm_model &lt;- linear_reg() %&gt;% 
-  set_engine(&quot;lm&quot;)
-
-lm_wf &lt;- workflow() %&gt;% 
-  add_recipe(airbnb_recipe) %&gt;% 
-  add_model(lm_model)</code></pre>
-</div>
 <div id="random-forest-model" class="section level3">
 <h3>Random Forest Model</h3>
+<pre class="r"><code># set.seed(2022)
+# rf_mod &lt;- rand_forest(mtry = tune(), trees = tune(), min_n = tune()) %&gt;%
+#   set_engine(&quot;ranger&quot;, importance = &quot;impurity&quot;) %&gt;%
+#   set_mode(&quot;regression&quot;)
+# 
+# rf_wf &lt;- workflow() %&gt;%
+#   add_recipe(airbnb_recipe) %&gt;%
+#   add_model(rf_mod)
+# 
+# param_grid &lt;- grid_regular(mtry(range = c(6,28)), 
+#                      trees(range = c(2, 5)), 
+#                      min_n(), levels = c(10,10,10))
+# 
+# tune_res_rf &lt;- tune_grid(
+#   rf_wf, 
+#   resamples = airbnb_fold, 
+#   grid = param_grid,
+# )</code></pre>
 </div>
 <div id="k-nearest-neighbours-model" class="section level3">
 <h3>K Nearest Neighbours Model</h3>
 </div>
 <div id="svm-model" class="section level3">
 <h3>SVM Model</h3>
+</div>
+<div id="boosted-tree" class="section level3">
+<h3>Boosted Tree</h3>
 </div>
 <div id="ridge-regression-model" class="section level3">
 <h3>Ridge Regression Model</h3>
