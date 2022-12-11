@@ -101,7 +101,7 @@ airbnb_clean <- airbnb %>%
 
 
 ```{r}
-write_rds(airbnb_clean, "data/processed/airbnb_clean.rds")
+# write_rds(airbnb_clean, "data/processed/airbnb_clean.rds")
 
 # load("/data/processed/airbnb_clean.rds")
 ```
@@ -184,8 +184,10 @@ airbnb_train
 #   # step_center(all_predictors()) %>% 
 #   # step_scale(all_predictors())
 
-airbnb_recipe <- recipe(price ~ . , data = airbnb_train) %>%
-  step_dummy(all_nominal_predictors())
+glimpse(airbnb_clean)
+
+airbnb_recipe <- recipe(price ~ minimum_nights + number_of_reviews + host_listings_count + availability_365 , data = airbnb_train)
+
 ```
 
 
@@ -258,7 +260,7 @@ autoplot(rf_tune)
 
 ```{r}
 # Save
-save(rf_tune, rand_forest_wf, rand_forest_grid, rand_forest_spec, file = "scripts/model_fitting/rf_model.rda")
+# save(rf_tune, rand_forest_wf, rand_forest_grid, rand_forest_spec, file = "scripts/model_fitting/rf_model.rda")
 ```
 
 ```{r}
