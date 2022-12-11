@@ -67,9 +67,9 @@ sapply(airbnb, function(x) sum(is.na(x)))
 
 airbnb$reviews_per_month[is.na(airbnb$reviews_per_month)] <- 0
 
-# airbnb$neighbourhood_group <- factor(airbnb$neighbourhood_group, levels = c('City of Los Angeles', 'Other Cities', 'Unincorporated Areas'))
-# 
-# airbnb$room_type <- factor(airbnb$room_type, levels = c('Entire home/apt', 'Hotel room', 'Private room', 'Shared room'))
+airbnb$neighbourhood_group <- factor(airbnb$neighbourhood_group, levels = c('City of Los Angeles', 'Other Cities', 'Unincorporated Areas'))
+
+airbnb$room_type <- factor(airbnb$room_type, levels = c('Entire home/apt', 'Hotel room', 'Private room', 'Shared room'))
 
 airbnb <- airbnb %>%
   rename(host_listings_count = calculated_host_listings_count) %>%
@@ -175,17 +175,159 @@ Don't tune for:
 
 ### Recipe Building
 
-```{r}
-airbnb_recipe <- recipe(price ~ ., data = airbnb_train) %>%
-  step_dummy(all_nominal_predictors()) %>% 
-  step_normalize(all_predictors())
-  # step_center(all_predictors()) %>% 
-  # step_scale(all_predictors())
+airbnb_train
 
-airbnb_recipe
+```{r}
+# airbnb_recipe <- recipe(price ~ ., data = airbnb_train) %>%
+#   step_dummy(all_nominal_predictors()) %>% 
+#   step_normalize(all_predictors())
+#   # step_center(all_predictors()) %>% 
+#   # step_scale(all_predictors())
+
+airbnb_recipe <- recipe(price ~ . , data = airbnb_train) %>%
+  step_dummy(all_nominal_predictors())
 ```
 
-airbnb_recipe
+
+### xgboost model
+
+```{r}
+set.seed(2022)
+boost_spec <- boost_tree(trees = tune(), 
+                         tree_depth = 8) %>%
+  set_engine("xgboost") %>%
+  set_mode("regression")
+
+boost_grid = grid_regular(trees(range = c(10, 2000)), levels = )
+
+boost_wf = workflow() %>%
+  add_model(boost_spec) %>%
+  add_recipe(airbnb_recipe)
+
+boost_tune_res <- tune_grid(boost_wf,
+                            resamples = airbnb_fold,
+                            grid = boost_grid)
+
+autoplot(boost_tune_res)
+
+boost_tune_res_metrics = collect_metrics(boost_tune_res)
+arrange(boost_tune_res_metrics, desc(mean))
+```
+
+
+### Random Forest Model
+
+```{r}
+set.seed(2022)
+rand_forest_spec <- rand_forest(mtry = tune(), trees = tune(), min_n = tune()) %>%
+  set_engine("ranger", importance = 'impurity') %>%
+  set_mode("regression")
+
+# rand_forest_grid <- grid_regular(mtry(range = c(2,6)),
+#                                       trees(range = c(2, 6)),
+#                                  min_n(),  # rf_params,
+#                                  levels = 2)
+
+rand_forest_wf <- workflow() %>%
+  add_model(rand_forest_spec) %>%
+  add_recipe(airbnb_recipe)
+
+# rand_forest_tune_res <- tune_grid(rand_forest_wf,
+#                                   resamples = airbnb_fold,
+#                                   grid = rand_forest_grid,
+#                                   )
+
+
+
+rf_params <- parameters(rand_forest_spec) %>% 
+  update(mtry = mtry(range= c(2, 6)))
+
+
+rf_grid <- grid_regular(rf_params, levels = 2)
+
+
+rf_tune <- rand_forest_wf %>% 
+  tune_grid(
+    resamples = airbnb_fold, 
+    # how does it complete the models in those workflows
+    grid = rf_grid)
+
+
+autoplot(rand_forest_tune_res)
+```
+
+```{r}
+# Save
+save(rf_tune, rand_forest_wf, rand_forest_grid, rand_forest_spec, file = "scripts/model_fitting/rf_model.rda")
+```
+
+```{r}
+
+
+collect_metrics(rand_forest_tune_res, metric = ) %>%   
+  arrange(mean)
+
+show_best(rand_forest_tune_res, metric = "rsq")
+
+show_best(rand_forest_tune_res, metric = "rmse")
+
+final_rf <- rand_forest_wf %>%
+  finalize_workflow(select_best(rf_tune))
+
+final_rf
+```
+
+
+
+### K Nearest Neighbours Model
+
+```{r}
+kknn_recipe <- 
+  recipe(formula = price ~ ., data = airbnb_train) %>% 
+  step_zv(all_predictors()) %>% 
+  step_normalize(all_numeric_predictors()) 
+
+kknn_spec <- 
+  nearest_neighbor(neighbors = tune(), weight_func = tune()) %>% 
+  set_mode("classification") %>% 
+  set_engine("kknn") 
+
+kknn_workflow <- 
+  workflow() %>% 
+  add_recipe(kknn_recipe) %>% 
+  add_model(kknn_spec) 
+
+set.seed(67144)
+kknn_tune <-
+  tune_grid(kknn_workflow, resamples = stop("add your rsample object"), grid = stop("add number of candidate points"))
+```
+
+### SVM Model
+
+```{r}
+
+```
+
+### Boosted Tree
+
+```{r}
+
+```
+
+### Ridge Regression Model
+
+```{r}
+
+```
+
+### Lasso Regression Model
+
+```{r}
+
+```
+
+
+### decision tree (regression)
 
 
 ```{r}
@@ -236,106 +378,6 @@ augment(reg_tree_final_fit, new_data = ames_test) %>%
 
 ```
 
-### Random Forest Model
-
-```{r}
-set.seed(2022)
-rand_forest_spec <- rand_forest(mtry = tune(), trees = tune(), min_n = tune()) %>%
-  set_engine("ranger", importance = 'impurity') %>%
-  set_mode("regression")
-
-# rf_params <- parameters(rand_forest) %>% 
-#   update(mtry = mtry(range= c(2, 6)))
-
-rand_forest_grid <- grid_regular(mtry(range = c(2,6)),
-                                      trees(range = c(2, 6)),
-                                 min_n(),  # rf_params,
-                                 levels = 2)
-
-rand_forest_grid
-
-
-rand_forest_wf <- workflow() %>%
-  add_model(rand_forest_spec) %>%
-  add_recipe(airbnb_recipe)
-
-rand_forest_tune_res <- tune_grid(rand_forest_wf,
-                                  resamples = airbnb_fold,
-                                  grid = rand_forest_grid,
-                                  )
-
-
-rand_forest_tune_res %>%
-  collect_metrics() %>%
-  filter(.metric == "roc_auc") %>%
-  select(mean, min_n, mtry) %>%
-  pivot_longer(min_n:mtry,
-    values_to = "value",
-    names_to = "parameter"
-  ) %>%
-  ggplot(aes(value, mean, color = parameter)) +
-  geom_point(show.legend = FALSE) +
-  facet_wrap(~parameter, scales = "free_x") +
-  labs(x = NULL, y = "AUC")
-
-# param_grid <- grid_regular(mtry(range = c(6,28)),
-#                      trees(range = c(2, 5)),
-#                      min_n(), levels = c(10,10,10))
-
-
-autoplot(rand_forest_tune_res)
-```
-
-```{r}
-# Save
-save(rand_forest_tune_res, rand_forest_wf, rand_forest_grid, rand_forest_spec, file = "scripts/model_fitting/rf_model.rda")
-```
-
-```{r}
-
-
-collect_metrics(rand_forest_tune_res, metric = ) %>%   
-  arrange(mean)
-
-show_best(rand_forest_tune_res, metric = "rsq")
-
-show_best(rand_forest_tune_res, metric = "rmse")
-
-autoplot(rand_forest_tune_res)
-```
-
-
-
-### K Nearest Neighbours Model
-
-```{r}
-
-```
-
-### SVM Model
-
-```{r}
-
-```
-
-### Boosted Tree
-
-```{r}
-
-```
-
-### Ridge Regression Model
-
-```{r}
-
-```
-
-### Lasso Regression Model
-
-```{r}
-
-```
-
 ### Bagging
 
 ```{r}
@@ -343,7 +385,6 @@ set.seed(2022)
 bagging_spec <- rand_forest(mtry = .cols()) %>%
   set_engine("randomForest", importance = TRUE) %>%
   set_mode("regression")
-
 
 
 bagging_fit <- fit(bagging_spec, airbnb_recipe, 
