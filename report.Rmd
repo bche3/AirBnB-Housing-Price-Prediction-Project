@@ -73,7 +73,7 @@ From a general outlook, we can see that there are 11 numeric variables and 7 non
 sapply(airbnb, function(x) sum(is.na(x)))
 ```
 
-The variables with missing values that stick out to us are `neighbourhood_group` and `reviews_per_month`, which we'll need to manipulate the data to resolve. `neighbourhood_group`== is an important
+The variables with missing values that stick out to us are `neighbourhood_group` and `reviews_per_month`, which we'll need to manipulate the data to resolve. `neighbourhood_group` will be an important predictor that is required for every listing and should not be missing. For `reviews_per_month`, there is an issue for listings with 0 reviews at all to show NA, so we'll replace the NA values with 0. `Price` and `Availability_365` can't have a value of 0 as that would be mean it would never be available so we remove rows with this value. Lastly, we remove `id`, `name`, `host_id`, `host_name`, `last_review`, and `license`.
 
 ```{r}
 airbnb$reviews_per_month[is.na(airbnb$reviews_per_month)] <- 0
@@ -95,14 +95,19 @@ airbnb <- airbnb[sample(nrow(airbnb), size=15000), ]
 ```
 
 ```{r, class.source = 'fold-hide'}
+# sanity check
 airbnb %>%
   summary()
 ```
+
+For sake of faster runtime, we will subset the dataset to a random sample of 15,000, and as a sanity check, we take a look at the summary for the numeric statistics and presence of missing values, we can see all conflict was resolved through our data cleaning.
 
 ```{r, class.source = 'fold-hide'}
 # include use="pairwise.complete.obs" to exclude NAs
 corrplot(cor(Filter(is.numeric, airbnb)), method = 'color', )
 ```
+
+Using a correlation plot on the continuous variables, we observe that `number_of_reviews_ltm` and `reviews_per_month` for being highly correlated with `number_of_reviews`, and we pay close to attention to other variables relation with `price` to find nothing overwhelmingly significant yet asides from a slight negative correlation with the latter variables.
 
 ```{r}
 # drop number_of_reviews_ltm and reviews_per_month for being highly correlated with number_of_reviews
@@ -114,12 +119,14 @@ airbnb_clean <- airbnb %>%
 write_rds(airbnb_clean, "data/processed/airbnb_clean.rds")
 ```
 
-```{r, class.source = 'fold-hide'}
-# use corrplot to make correlation of cont vars
-corrplot(cor(Filter(is.numeric, airbnb_clean)), method = 'color')
+```{r, warning=FALSE}
+ggplot(airbnb_clean, aes(price)) +
+  geom_histogram(bins = 30, aes(y = ..density..), fill = "purple") + 
+  geom_density(alpha = 0.2, fill = "purple") +
+  ggtitle("Distribution of Price") +
+  theme(axis.title = element_text(), axis.title.x = element_text()) +
+  geom_vline(xintercept = round(mean(airbnb$price), 2), size = 2, linetype = 3)
 ```
-
-For sake of faster runtime, we wil
 
 ```{r, class.source = 'fold-hide'}
 NAnalysis <- airbnb_clean %>% 
@@ -132,6 +139,8 @@ ggplot(NAnalysis, aes(x = reorder(neighbourhood_group, -Mean_Price), y = Mean_Pr
         plot.subtitle = element_text(hjust = 0.5), legend.position = c(0.8, 0.5)) + xlab("") + ylab("Mean Price")
 ```
 
+We create a bar graph for the mean price by neighbourood groups with results of not too great of variation and the City of Los Angeles having the highest mean prices.
+
 ```{r, class.source = 'fold-hide'}
 ggplot(airbnb_clean, aes(x = room_type, y = price)) +
   geom_boxplot(aes(fill = room_type)) + scale_y_log10() +
@@ -141,9 +150,11 @@ ggplot(airbnb_clean, aes(x = room_type, y = price)) +
   geom_hline(yintercept = mean(airbnb$price), color = "purple", linetype = 2)
 ```
 
+Using a bar plot, we see that room_type, a categorical value, shows significant variation with its particular relationship to price with "Entire home/apt" having the highest mean price range with a mean around \$250, followed by hotel room with \$100, private room with \$85, and shared room with \$50. The variable `room_type` may show promise in its relationship with our response variable, which we'll include in our recipe through dummy variables.
+
 ## Data Splitting & Cross-validation
 
--   Describe your process of splitting data into training, test, and/or validation sets.
+With our subsetted data we perform a log transformation on price due to its skewed distribution and use 80/20 split for training and testing. We aim to have a significant amount of data to train our models on, resultling with 11999 observations in our training set and 3001 observations in our testing set.
 
 ```{r}
 set.seed(2022)
@@ -158,14 +169,11 @@ dim(airbnb_train)
 dim(airbnb_test)
 ```
 
-```{r}
-airbnb_train %>%
-  summary()
-```
 
--   Describe the process of cross-validation.
 
 ### Cross Validation Folding on Training
+
+Using function `vfold_cv()`, we'll use stratified cross validation of 10 folds with strata `price` and overallow allows us to use it as a tool for machine learning by training a number of models on different subsets of the input data.
 
 ```{r, warning=FALSE,message=FALSE}
 set.seed(2022)
@@ -174,23 +182,23 @@ airbnb_fold <- vfold_cv(airbnb_train, v = 10, strata = price)
 
 ## Model Fitting
 
--   Describe the types of models you fit, their parameter values, and the results.
+As the main part of our project, we will be building four machine learning models that will utilize our formula `airbnb_recipe` to observe the results of different models trained on the same dataset and see which will provide the best accuracy in prediction. Our metrics that we will use to determine their performances will be the test R-squared and RMSE. Essentially, we will follow a similar process throughout all 4 model building processes, which is establishing the workflow with the model and parameters specified, use a tuning grid over the folds that will be resampled, select the best tuned model from the tuning, and create a final workflow that is then fit to our testing set. The four models we will be using are boosting, random forest, K-nearest neighbors, and bagging.
 
-Tune for: Boosting, Random Forest Model, K Nearest Neighbors Model, Bagging
 
 ### Recipe Building
 
-airbnb_train
+From our training dataset, we'll establish our recipe with `price` as a response variable with 8 predictors, using `step_dummy()` for our non-numeric predictors `room_type` and `neighbourhood_group`.
 
 ```{r, warning=FALSE,message=FALSE}
 airbnb_recipe <- recipe(price ~ . , data = airbnb_train) %>%
-  step_dummy(all_nominal_predictors())
+  # dummy predictors for categorical values room_type and neighbourhood_group
+  step_dummy(all_nominal_predictors()) 
 ```
 
-### xgboost model
+### Boosting model
 
+For the boosted model, the parameters used include a `tree_depth` of 8 for the number of maximum depth of the tree, ``levels` values of 10, and `trees` range from 10 to 500 as I found when adjusting the parameters for better accuracy around 500 as the accuracy decreased as the range end value did
 ```{r, warning=FALSE, message=FALSE, eval=FALSE}
-
 set.seed(2022)
 
 # trees = tune(), tree_depth = 8
@@ -199,17 +207,19 @@ boost_spec <- boost_tree(trees = tune(),
   set_engine("xgboost") %>%
   set_mode("regression")
 
+# creating grid
 boost_grid = grid_regular(trees(range = c(10, 500)), levels = 10)
 
+# boosting workflow
 boost_wf = workflow() %>%
   add_model(boost_spec) %>%
   add_recipe(airbnb_recipe)
 
+# tuning grid for boosting model
 boost_tune_res <- tune_grid(boost_wf,
                             resamples = airbnb_fold,
                             grid = boost_grid)
 ```
-
 
 ```{r, class.source = 'fold-hide'}
 # save(boost_tune_res, boost_wf, boost_grid, boost_spec, file = "scripts/model_fitting/boost_model.rda")
@@ -226,6 +236,8 @@ show_best(boost_tune_res, metric = "rsq")
 show_best(boost_tune_res, metric = "rmse")
 ```
 
+The R-squared value peaks at 0.612 around 64 trees and gradually declines afterwards and the RMSE is lowest then at 0.557 as well.
+
 ```{r, warning=FALSE,message=FALSE}
 best_trees <- select_best(boost_tune_res)
 
@@ -237,6 +249,8 @@ boost_fit <- boost_final %>%
 
 ### Random Forest Model
 
+With the random forest, my mtry value has a frange from 1 to 8 as 8 is the number of predictors being used in the model, keeping that range for trees and min_n and levels at 4.
+
 ```{r, warning=FALSE,message=FALSE, eval=FALSE}
 set.seed(2022)
 rand_forest_spec <- rand_forest(mtry = tune(), 
@@ -245,15 +259,18 @@ rand_forest_spec <- rand_forest(mtry = tune(),
   set_engine("ranger", importance = 'impurity') %>%
   set_mode("regression")
 
+# random forest workflow
 rand_forest_wf <- workflow() %>%
   add_model(rand_forest_spec) %>%
   add_recipe(airbnb_recipe)
 
+# define grid
 rand_forest_grid <- grid_regular(mtry(range = c(1,8)),
                                       trees(range = c(1, 8)),
                                  min_n(range = c(1, 8)),  
                                        levels = 4)
 
+# tuning grid for random forest model
 rf_tune <- rand_forest_wf %>% 
   tune_grid(
     resamples = airbnb_fold, 
@@ -269,13 +286,13 @@ load('scripts/model_fitting/rf_model.rda')
 autoplot(rf_tune)
 ```
 
-
-
 ```{r}
 show_best(rf_tune, metric = "rsq")
 
 show_best(rf_tune, metric = "rmse")
 ```
+
+We observe that with a higher number of randomly selected predictors used and higher number of trees, the greater the accuracy is as shown with the number of trees being 8 and mtry 5 having its R-squared value peaking at 0.585 and its RMSE value being lowest at 0.576
 
 ```{r, warning=FALSE,message=FALSE}
 best_mtry <- select_best(rf_tune)
@@ -288,6 +305,8 @@ rf_fit <- rf_final %>%
 
 ### K Nearest Neighbours Model
 
+For Knn, the parameters take an argument of knn_spec and set levels to 8.
+
 ```{r, warning=FALSE,message=FALSE, eval=FALSE}
 set.seed(2022)
 
@@ -296,21 +315,21 @@ knn_spec <- nearest_neighbor(
     mode = "regression") %>% 
   set_engine("kknn")
 
+# Knn workflow
 knn_wf <- workflow() %>% 
   add_model(knn_spec) %>% 
   add_recipe(airbnb_recipe)
 
-# set-up tuning grid ----
-knn_params <- parameters(knn_spec)
+# define parameters for grid
+knn_parameters <- parameters(knn_spec)
 
-# define grid
-knn_grid <- grid_regular(knn_params, levels = 8)
+# create grid
+knn_grid <- grid_regular(knn_parameters, levels = 8)
 
+# tuning grid for knn model
 knn_tune <- knn_wf %>% 
   tune_grid(
-    # what will it fit the workflow to
     resamples = airbnb_fold, 
-    # how does it complete the models in those workflows
     grid = knn_grid)
 ```
 
@@ -329,6 +348,8 @@ show_best(knn_tune, metric = "rsq")
 show_best(knn_tune, metric = "rmse")
 ```
 
+Here we observe that the greater the number of nearest neighbors, the better the accuracy as the R-squared value peaks at 0.546 around 15 neighbors and the RMSE is at 0.603.
+
 ```{r, warning=FALSE,message=FALSE}
 best_knn <- select_best(knn_tune)
 
@@ -340,6 +361,7 @@ knn_fit <- knn_final %>%
 
 ### Bagging
 
+For Knn, the parameters take an argument of knn_spec and set levels to 4.
 ```{r, warning=FALSE,message=FALSE, eval=FALSE}
 set.seed(2022)
 
@@ -352,15 +374,19 @@ bag_spec <-
   set_engine("rpart", times = 10) %>%
   set_mode("regression")
 
+# bagging workflow
 bag_wf <-
   workflow() %>%
   add_recipe(airbnb_recipe) %>%
   add_model(bag_spec)
 
-bag_params <- parameters(bag_spec)
+# defining parameters for bag_grid
+bag_parameters <- parameters(bag_spec)
 
+# creating grid
 bag_grid <- grid_regular(bag_params, levels = 4)
 
+# tuning grid for bagging model
 bag_tune <- bag_wf %>% 
   tune_grid(
     # what will it fit the workflow to
@@ -384,6 +410,8 @@ show_best(bag_tune, metric = "rsq")
 show_best(bag_tune, metric = "rmse")
 ```
 
+We observe that the greater the tre depth, the better the accuracy is as shown with the tree depth of 15 with the R-squared value peaking at 0.592 and the RMSE being lowest at 0.571.
+
 ```{r, warning=FALSE,message=FALSE}
 best_cost <- select_best(bag_tune)
 
@@ -394,9 +422,6 @@ bag_fit <- bag_final %>%
 ```
 
 ## Model Selection & Performance
-
--   A table and/or graph describing the performance of your best-fitting model on testing data.
--   Describe your best-fitting model however you choose, and the quality of its predictions, etc.
 
 ```{r, warning=FALSE,message=FALSE, class.source = 'fold-hide'}
 boost_rsq <- augment(boost_fit, new_data = airbnb_test)%>%
@@ -448,12 +473,8 @@ augment(boost_fit, new_data = airbnb_test) %>%
   geom_point(alpha = 0.5)
 ```
 
+Storing our accuracies in our table, we compare to find the our boosting model has the best accuracy with a R-squared value of 0.63, followed by random forest with 0.601, bagging with 0.599, and Knn with 0.566. With boosting specializing with fast gradient-boosting and high accuracy using the XGBoost library, it functions to match weak learners, which have poor predictive power, to a specified weighted subset of the dataset. Thus, our boosting model is effective with large data sets and applies tree algorithms that do not need normalized features with optimizing for regression. Observing the scatterplot with the true values compared to the predicted values, we notice that there is high variation that obviously comes with large dataset as the spread of prices is underfitted.
+
 ## Conclusion
 
--   Discusses the outcome(s) of models you fit.
--   Which models performed well, which performed poorly?
--   Were you surprised by model performance?
--   Next steps?
--   General conclusions?
-
-If I were to do this again, I would include the "names" variable, which is the title the hosts manually input for their listings, to tokenize and see if certain words or phrases may correlate to the prices (e.g. "luxury" or "mansion" which may have more expensive values).
+While the accuracies of the predictive models were not ideal, we were able to compare the various applications of these machine learning techniques and see the full process taking place in order to build a model, tune it, and then fit a final selective model. With our boosting model having the best performance, I believe it showcases the model's advantage in improving its performance iteratively through the k-fold cross validation and gradually lowers bias and variance. Although as seen from the scatterplot, there is a case of underfitting present through our models. It was surprising to see that random forest did not have a better performance as I believed it would be better used for a focus as price prediction due to its application of multiple decision trees that results in a lesser chance of over-fitting and generally has a greater accuracy with lerger datasets. The model results in their RSQ were somewhat close in value from the lowet being 56% to the highest being 63%. If I were to do this again, I would include the "names" variable, which is the title the hosts manually input for their listings, to tokenize and see if certain words or phrases may correlate to the prices (e.g. "luxury" or "mansion" which may have more expensive values). Overall, 
