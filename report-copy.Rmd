@@ -19,14 +19,17 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Introduction
 
+This machine learning project consists of building 4 different predictive models to find the best predictor of AirBnB Los Angeles listing prices through regression.
+
+### What is AirBnB?
+
+AirBnB, standing for "Air Bed and Breakfest" is a vacational rental company that serves as an online marketplace that connects people who want to rent out their homes with people who are looking for accomodations at their preferred destinations. Travelers are able to rent a space for multiple people to share, a shared space with private rooms, or the entire property for themselves for a specific duration of days. Essentially, each listing is set at minimum price per night by the owner for their property that is caclulated into the toal pricing of their stay, which may usually include service fees, tax, etc.
+
+### Overview of the Dataset
+The dataset I'll be using is from "[Inside AirBnB](http://insideairbnb.com/get-the-data/)" which is a mission driven project that provides data and advocacy about Airbnb's impact on residential communities, and is specifically focused on the Los Angeles, California, U.S. region at a compile date of September 9, 2022.
+
+
 - Describes the data, the research questions, provides any background readers need to understand your project, etc.
-
-Quarterly data for the last year for each region is available for free download on this page
-Inside Airbnb is a mission driven project that provides data and advocacy about Airbnb's impact on residential communities.
-
-We work towards a vision where data and information empower communities to understand, decide and control the role of renting residential homes to tourists.
-
-Los Angeles listings.csv <http://insideairbnb.com/get-the-data/>
 
 
 ### Load libraries and data
@@ -42,8 +45,9 @@ library(vip)
 library(rpart.plot)
 library(ranger)
 library(kernlab)
+library(kknn)
 
-# read in data
+# read in data (45)
 airbnb <- read_csv("data/unprocessed/listings.csv")
 ```
 
@@ -96,12 +100,12 @@ corrplot(cor(Filter(is.numeric, airbnb)), method = 'color', )
 # drop neighbourhood, latitude, longitude,
 # drop number_of_reviews_ltm and reviews_per_month for being highly correlated with number_of_reviews
 airbnb_clean <- airbnb %>%
-  select(-neighbourhood, -latitude, -longitude, -number_of_reviews_ltm, -reviews_per_month)
+  select(-neighbourhood, -number_of_reviews_ltm, -reviews_per_month)
 ```
 
 
 ```{r}
-# write_rds(airbnb_clean, "data/processed/airbnb_clean.rds")
+write_rds(airbnb_clean, "data/processed/airbnb_clean.rds")
 
 # load("/data/processed/airbnb_clean.rds")
 ```
@@ -135,8 +139,9 @@ corrplot(cor(Filter(is.numeric,airbnb_clean)), method = 'color')
 
 ```{r}
 set.seed(2022)
-airbnb_split <- airbnb_clean %>% initial_split(strata = price, prop = 0.8)
-airbnb_split
+airbnb_split <- airbnb_clean %>% 
+  mutate(price = log(price)) %>%
+  initial_split(strata = price, prop = 0.8) 
 
 airbnb_train <- training(airbnb_split)
 airbnb_test <- testing(airbnb_split)
@@ -184,10 +189,10 @@ airbnb_train
 #   # step_center(all_predictors()) %>% 
 #   # step_scale(all_predictors())
 
-glimpse(airbnb_clean)
+airbnb_recipe <- recipe(price ~ . , data = airbnb_train) %>%
+  step_dummy(all_nominal_predictors())
 
-airbnb_recipe <- recipe(price ~ minimum_nights + number_of_reviews + host_listings_count + availability_365 , data = airbnb_train)
-
+airbnb_recipe
 ```
 
 
@@ -195,12 +200,14 @@ airbnb_recipe <- recipe(price ~ minimum_nights + number_of_reviews + host_listin
 
 ```{r}
 set.seed(2022)
+
+# trees = tune(), tree_depth = 8
 boost_spec <- boost_tree(trees = tune(), 
                          tree_depth = 8) %>%
   set_engine("xgboost") %>%
   set_mode("regression")
 
-boost_grid = grid_regular(trees(range = c(10, 2000)), levels = )
+boost_grid = grid_regular(trees(range = c(10, 2000)), levels = 8)
 
 boost_wf = workflow() %>%
   add_model(boost_spec) %>%
@@ -215,20 +222,21 @@ autoplot(boost_tune_res)
 boost_tune_res_metrics = collect_metrics(boost_tune_res)
 arrange(boost_tune_res_metrics, desc(mean))
 ```
-
+```{r}
+save(boost_tune_res, boost_wf, boost_grid, boost_spec, file = "scripts/model_fitting/boost_model.rda")
+```
 
 ### Random Forest Model
 
 ```{r}
 set.seed(2022)
-rand_forest_spec <- rand_forest(mtry = tune(), trees = tune(), min_n = tune()) %>%
+rand_forest_spec <- rand_forest(mtry = tune(), 
+                                trees = tune(), 
+                                min_n = tune()) %>%
   set_engine("ranger", importance = 'impurity') %>%
   set_mode("regression")
 
-# rand_forest_grid <- grid_regular(mtry(range = c(2,6)),
-#                                       trees(range = c(2, 6)),
-#                                  min_n(),  # rf_params,
-#                                  levels = 2)
+
 
 rand_forest_wf <- workflow() %>%
   add_model(rand_forest_spec) %>%
@@ -241,18 +249,23 @@ rand_forest_wf <- workflow() %>%
 
 
 
-rf_params <- parameters(rand_forest_spec) %>% 
-  update(mtry = mtry(range= c(2, 6)))
+# rf_params <- parameters(rand_forest_spec) %>% 
+#   update(mtry = mtry(range= c(2, 6)))
+# 
+# 
+# rf_grid <- grid_regular(rf_params, levels = 2)
 
-
-rf_grid <- grid_regular(rf_params, levels = 2)
+rand_forest_grid <- grid_regular(mtry(range = c(1,8)),
+                                      trees(range = c(1, 8)),
+                                 min_n(range = c(1, 8)),  
+                                       levels = 4)
 
 
 rf_tune <- rand_forest_wf %>% 
   tune_grid(
     resamples = airbnb_fold, 
     # how does it complete the models in those workflows
-    grid = rf_grid)
+    grid = rand_forest_grid)
 
 
 autoplot(rf_tune)
@@ -260,7 +273,7 @@ autoplot(rf_tune)
 
 ```{r}
 # Save
-# save(rf_tune, rand_forest_wf, rand_forest_grid, rand_forest_spec, file = "scripts/model_fitting/rf_model.rda")
+save(rf_tune, rand_forest_wf, rand_forest_grid, rand_forest_spec, file = "scripts/model_fitting/rf_model.rda")
 ```
 
 ```{r}
@@ -284,220 +297,112 @@ final_rf
 ### K Nearest Neighbours Model
 
 ```{r}
-kknn_recipe <- 
-  recipe(formula = price ~ ., data = airbnb_train) %>% 
-  step_zv(all_predictors()) %>% 
-  step_normalize(all_numeric_predictors()) 
+set.seed(2022)
 
-kknn_spec <- 
-  nearest_neighbor(neighbors = tune(), weight_func = tune()) %>% 
-  set_mode("classification") %>% 
-  set_engine("kknn") 
+knn_spec <- nearest_neighbor(
+    neighbors = tune(),
+    mode = "regression") %>% 
+  set_engine("kknn")
 
-kknn_workflow <- 
-  workflow() %>% 
-  add_recipe(kknn_recipe) %>% 
-  add_model(kknn_spec) 
+knn_wf <- workflow() %>% 
+  add_model(knn_model) %>% 
+  add_recipe(airbnb_recipe)
 
-set.seed(67144)
-kknn_tune <-
-  tune_grid(kknn_workflow, resamples = stop("add your rsample object"), grid = stop("add number of candidate points"))
+# set-up tuning grid ----
+knn_params <- parameters(knn_spec)
+
+
+# define grid
+knn_grid <- grid_regular(knn_params, levels = 8)
+
+knn_tune <- knn_wf %>% 
+  tune_grid(
+    # what will it fit the workflow to
+    resamples = airbnb_fold, 
+    # how does it complete the models in those workflows
+    grid = knn_grid)
+
+autoplot(knn_tune)
 ```
-
-### SVM Model
+```{r}
+save(knn_tune, knn_wf, knn_grid, knn_spec, file = "scripts/model_fitting/knn_model.rda")
+```
 
 ```{r}
+collect_metrics(knn_tune, metric = ) %>%   
+  arrange(mean)
 
+show_best(knn_tune, metric = "rsq")
+
+show_best(knn_tune, metric = "rmse")
 ```
-
-### Boosted Tree
-
-```{r}
-
-```
-
-### Ridge Regression Model
-
-```{r}
-
-```
-
-### Lasso Regression Model
-
-```{r}
-
-```
-
-
-### decision tree (regression)
-
 
 ```{r}
 set.seed(2022)
-tree_spec <- decision_tree() %>%
-  set_engine("rpart")
 
-reg_tree_spec <- tree_spec %>%
+bag_spec <-
+  bag_tree(
+    cost_complexity = tune(),
+    tree_depth = tune(),
+    min_n = tune()
+  ) %>%
+  set_engine("rpart", times = 10) %>%
   set_mode("regression")
 
-head(airbnb_train)
+bag_wf <-
+  workflow() %>%
+  add_recipe(airbnb_recipe) %>%
+  add_model(bag_spec)
 
-reg_tree_fit <- fit(reg_tree_spec, airbnb_recipe, airbnb_train)
-
-augment(reg_tree_fit, new_data = airbnb_test) %>%
-  rmse(truth = price, estimate = .pred)
-
-reg_tree_fit %>%
-  extract_fit_engine() %>%
-  rpart.plot()
-
-reg_tree_wf <- workflow() %>%
-  add_model(reg_tree_spec %>% set_args(cost_complexity = tune())) %>%
-  add_formula(airbnb_recipe)
-
-param_grid <- grid_regular(cost_complexity(range = c(1, 6)), levels = 10)
-
-tune_res <- tune_grid(
-  reg_tree_wf, 
-  resamples = airbnb_fold, 
-  grid = param_grid
-)
-
-autoplot(tune_res)
-
-best_complexity <- select_best(tune_res, metric = "rmse")
-
-reg_tree_final <- finalize_workflow(reg_tree_wf, best_complexity)
-
-reg_tree_final_fit <- fit(reg_tree_final, data = airbnb_train)
-
-reg_tree_final_fit %>%
-  extract_fit_engine() %>%
-  rpart.plot()
-
-augment(reg_tree_final_fit, new_data = ames_test) %>%
-  rmse(truth = sale_price, estimate = .pred)
-
-```
-
-### Bagging
-
-```{r}
-set.seed(2022)
-bagging_spec <- rand_forest(mtry = .cols()) %>%
-  set_engine("randomForest", importance = TRUE) %>%
-  set_mode("regression")
-
-
-bagging_fit <- fit(bagging_spec, airbnb_recipe, 
-                   data = airbnb_train)
-
-augment(bagging_fit, new_data = airbnb_test) %>%
-  rmse(truth = sale_price, estimate = .pred)
-
-augment(bagging_fit, new_data = airbnb_test) %>%
-  ggplot(aes(price, .pred)) +
-  geom_abline() +
-  geom_point(alpha = 0.5)
-
-vip(bagging_fit)
-```
-
-```{r}
-# price ~ neighbourhood(dummies) + minimum_nights + room_type(dummies) + number of reviews + reviews_per_month + calculated_host_listings_count + availability_365
-
-
-# recipe(price ~ .) %>%
-#   step_dummy(all_nominal_predictors()) %>% 
-#   step_normalize(all_predictors())
-# 
-# reg_tree_spec <- tree_spec %>%
-#   set_mode("regression")
-#   
-# reg_tree_fit <- fit(reg_tree_spec, 
-#                     sale_price ~ . -ms_sub_class -ms_zoning, ames_train)
-# 
-# augment(reg_tree_fit, new_data = ames_test) %>%
-#   rmse(truth = sale_price, estimate = .pred)
-# 
-# reg_tree_fit %>%
-#   extract_fit_engine() %>%
-#   rpart.plot()
-# 
-# reg_tree_wf <- workflow() %>%
-#   add_model(reg_tree_spec %>% set_args(cost_complexity = tune())) %>%
-#   add_formula(sale_price ~ .)
-# 
-# set.seed(3435)
-# ames_fold <- vfold_cv(ames_train)
-# 
-# param_grid <- grid_regular(cost_complexity(range = c(-4, -1)), levels = 10)
-# 
-# tune_res <- tune_grid(
-#   reg_tree_wf, 
-#   resamples = ames_fold, 
-#   grid = param_grid
+# bag_grid <- grid_regular(
+#   tree_depth(),
+#   levels = 10
 # )
-# 
-# autoplot(tune_res)
-# 
-# best_complexity <- select_best(tune_res, metric = "rmse")
-# 
-# reg_tree_final <- finalize_workflow(reg_tree_wf, best_complexity)
-# 
-# reg_tree_final_fit <- fit(reg_tree_final, data = ames_train)
-# 
-# reg_tree_final_fit %>%
-#   extract_fit_engine() %>%
-#   rpart.plot()
-# 
-# augment(reg_tree_final_fit, new_data = ames_test) %>%
-#   rmse(truth = sale_price, estimate = .pred)
-# 
-# ###
-# 
-# bagging_spec <- rand_forest(mtry = .cols()) %>%
-#   set_engine("randomForest", importance = TRUE) %>%
-#   set_mode("regression")
-# 
-# bagging_fit <- fit(bagging_spec, sale_price ~ ., 
-#                    data = ames_train)
-# 
-# augment(bagging_fit, new_data = ames_test) %>%
-#   rmse(truth = sale_price, estimate = .pred)
-# 
-# augment(bagging_fit, new_data = ames_test) %>%
-#   ggplot(aes(sale_price, .pred)) +
-#   geom_abline() +
-#   geom_point(alpha = 0.5)
-# 
-# vip(bagging_fit)
-# 
-# rf_spec <- rand_forest(mtry = 6) %>%
-#   set_engine("randomForest", importance = TRUE) %>%
-#   set_mode("regression")
-# 
-# rf_fit <- fit(rf_spec, sale_price ~ ., data = ames_train)
-# 
-# augment(rf_fit, new_data = ames_train) %>%
-#   rmse(truth = sale_price, estimate = .pred)
-# 
-# augment(rf_fit, new_data = ames_test) %>%
-#   ggplot(aes(sale_price, .pred)) +
-#   geom_abline() +
-#   geom_point(alpha = 0.5)
-# 
-# vip(rf_fit)
-# 
-# ### 
-# boost_spec <- boost_tree(trees = 5000, tree_depth = 4) %>%
-#   set_engine("xgboost") %>%
-#   set_mode("regression")
-# 
-# boost_fit <- fit(boost_spec, sale_price ~ ., data = ames_train)
-# 
-# augment(boost_fit, new_data = ames_test) %>%
-#   rmse(truth = sale_price, estimate = .pred)
+
+bag_params <- parameters(bag_spec)
+
+bag_grid <- grid_regular(bag_params, levels = 4)
+
+# bag_grid <- grid_regular(mtry(range = c(1,8)),
+#                                       trees(range = c(1, 8)),
+#                                  min_n(range = c(1, 8)),  
+#                                        levels = 4)
+
+bag_tune <- bag_wf %>% 
+  tune_grid(
+    # what will it fit the workflow to
+    resamples = airbnb_fold, 
+    # how does it complete the models in those workflows
+    grid = bag_grid)
+
+autoplot(bag_tune)
+```
+```{r}
+save(bag_tune, bag_wf, bag_grid, bag_spec, file = "scripts/model_fitting/bagging_model.rda")
+```
+
+```{r}
+collect_metrics(bag_tune, metric = ) %>%   
+  arrange(mean)
+
+show_best(bag_tune, metric = "rsq")
+
+show_best(bag_tune, metric = "rmse")
+
+```
+
+
+### Comparing model accuracies for training
+```{r}
+best_model <- select_best(tune_res, metric = "roc_auc")
+
+en_final <- finalize_workflow(en_workflow, best_model)
+
+en_final_fit <- fit(en_final, data = pokemon_train)
+
+predicted_data <- augment(en_final_fit, new_data = pokemon_test) %>% 
+  select(type_1, starts_with(".pred"))
+
 ```
 
 
@@ -516,67 +421,3 @@ vip(bagging_fit)
 - General conclusions?
 
 
-
-
-
-
-
-=======
-
-## References
-
-```{r}
-# library(tidymodels)
-# library(ISLR)
-# library(ISLR2)
-# library(tidyverse)
-# library(glmnet)
-# library(janitor)
-# tidymodels_prefer()
-# 
-# 
-# Hitters <- as_tibble(Hitters) %>%
-#   filter(!is.na(Salary))
-# 
-# Hitters
-# 
-# Hitters %>% select(Division) %>% table()
-# 
-# Hitters %>% select(League) %>% table()
-# 
-# data(ames, package = "modeldata")
-# 
-# ames <- as_tibble(ames) %>% 
-#   clean_names()
-# 
-# ames
-```
-
-
-### Tabset Reference {.tabset}
-
-#### Test 1
-
-Text 1
-
-#### Test 2
-
-Text 2
-
-#### Test 3
-
-Text 3
-
-### Chunk code-fold show / code-fold hide
-
-```{r,warning=FALSE,message=FALSE, class.source = 'fold-hide'}
-# load libraries
-library(tidyverse)
-library(tidymodels)
-```
-
-```{r,warning=FALSE,message=FALSE, class.source = 'fold-show'}
-# load libraries
-library(tidyverse)
-library(tidymodels)
-```

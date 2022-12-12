@@ -223,10 +223,7 @@ rand_forest_spec <- rand_forest(mtry = tune(), trees = tune(), min_n = tune()) %
   set_engine("ranger", importance = 'impurity') %>%
   set_mode("regression")
 
-# rand_forest_grid <- grid_regular(mtry(range = c(2,6)),
-#                                       trees(range = c(2, 6)),
-#                                  min_n(),  # rf_params,
-#                                  levels = 2)
+
 
 rand_forest_wf <- workflow() %>%
   add_model(rand_forest_spec) %>%
@@ -239,18 +236,23 @@ rand_forest_wf <- workflow() %>%
 
 
 
-rf_params <- parameters(rand_forest_spec) %>% 
-  update(mtry = mtry(range= c(2, 6)))
+# rf_params <- parameters(rand_forest_spec) %>% 
+#   update(mtry = mtry(range= c(2, 6)))
+# 
+# 
+# rf_grid <- grid_regular(rf_params, levels = 2)
 
-
-rf_grid <- grid_regular(rf_params, levels = 2)
+rand_forest_grid <- grid_regular(mtry(range = c(1,6)),
+                                      trees(range = c(1, 6)),
+                                 min_n(range = c(1, 6)),  # rf_params,
+                                       levels = 6)
 
 
 rf_tune <- rand_forest_wf %>% 
   tune_grid(
     resamples = airbnb_fold, 
     # how does it complete the models in those workflows
-    grid = rf_grid)
+    grid = rand_forest_grid)
 
 
 autoplot(rf_tune)
