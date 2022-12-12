@@ -207,7 +207,7 @@ boost_spec <- boost_tree(trees = tune(),
   set_engine("xgboost") %>%
   set_mode("regression")
 
-boost_grid = grid_regular(trees(range = c(10, 2000)), levels = 8)
+boost_grid = grid_regular(trees(range = c(10, 500)), levels = 10)
 
 boost_wf = workflow() %>%
   add_model(boost_spec) %>%
@@ -219,11 +219,24 @@ boost_tune_res <- tune_grid(boost_wf,
 
 autoplot(boost_tune_res)
 
-boost_tune_res_metrics = collect_metrics(boost_tune_res)
-arrange(boost_tune_res_metrics, desc(mean))
+
 ```
 ```{r}
 save(boost_tune_res, boost_wf, boost_grid, boost_spec, file = "scripts/model_fitting/boost_model.rda")
+```
+
+```{r}
+boost_tune_res_metrics = collect_metrics(boost_tune_res)
+arrange(boost_tune_res_metrics, desc(mean))
+
+```
+```{r}
+best_trees <- select_best(boost_tune_res)
+
+boost_final <- finalize_workflow(boost_wf, best_trees)
+
+boost_fit <- boost_final %>% 
+  fit(airbnb_train)
 ```
 
 ### Random Forest Model
@@ -292,6 +305,14 @@ final_rf <- rand_forest_wf %>%
 final_rf
 ```
 
+```{r}
+best_mtry <- select_best(rf_tune)
+
+rf_final <- finalize_workflow(rf_wf, best_mtry)
+
+rf_fit <- rf_final %>% 
+  fit(airbnb_train)
+```
 
 
 ### K Nearest Neighbours Model
@@ -324,6 +345,7 @@ knn_tune <- knn_wf %>%
 
 autoplot(knn_tune)
 ```
+
 ```{r}
 save(knn_tune, knn_wf, knn_grid, knn_spec, file = "scripts/model_fitting/knn_model.rda")
 ```
@@ -336,6 +358,17 @@ show_best(knn_tune, metric = "rsq")
 
 show_best(knn_tune, metric = "rmse")
 ```
+
+```{r}
+best_knn <- select_best(knn_tune)
+
+knn_final <- finalize_workflow(knn_wf, best_cost)
+
+knn_fit <- knn_final %>% 
+  fit(airbnb_train)
+```
+
+### Bagging
 
 ```{r}
 set.seed(2022)
@@ -377,32 +410,74 @@ bag_tune <- bag_wf %>%
 
 autoplot(bag_tune)
 ```
+
 ```{r}
 save(bag_tune, bag_wf, bag_grid, bag_spec, file = "scripts/model_fitting/bagging_model.rda")
 ```
 
 ```{r}
-collect_metrics(bag_tune, metric = ) %>%   
-  arrange(mean)
+best_cost <- select_best(bag_tune)
 
-show_best(bag_tune, metric = "rsq")
+bag_final <- finalize_workflow(bag_wf, best_cost)
 
-show_best(bag_tune, metric = "rmse")
+bag_fit <- bag_final %>% 
+  fit(airbnb_train)
+
+
 
 ```
 
 
 ### Comparing model accuracies for training
+
 ```{r}
-best_model <- select_best(tune_res, metric = "roc_auc")
+boost_rsq <- augment(boost_fit, new_data = airbnb_test)%>%
+  rsq(truth = price, estimate = .pred)
 
-en_final <- finalize_workflow(en_workflow, best_model)
+boost_rmse <- augment(boost_fit, new_data = airbnb_test)%>%
+  rmse(truth = price, estimate = .pred) %>%
+  select(.est)
 
-en_final_fit <- fit(en_final, data = pokemon_train)
+rf_rsq <- augment(rf_fit, new_data = airbnb_test)%>%
+  rsq(truth = price, estimate = .pred) %>%
+  select(.est)
 
-predicted_data <- augment(en_final_fit, new_data = pokemon_test) %>% 
-  select(type_1, starts_with(".pred"))
+rf_rmse <- augment(rf_fit, new_data = airbnb_test)%>%
+  rmse(truth = price, estimate = .pred) %>%
+  select(.est)
 
+knn_rsq <- augment(knn_fit, new_data = airbnb_test)%>%
+  rmse(truth = price, estimate = .pred) %>%
+  select(.est)
+
+knn_rmse <- augment(knn_fit, new_data = airbnb_test)%>%
+  rsq(truth = price, estimate = .pred) %>%
+  select(.est)
+
+bag_rsq <- augment(bag_fit, new_data = airbnb_test)%>%
+  rsq(truth = price, estimate = .pred) %>%
+  select(.est)
+
+bag_rmse <- augment(bag_fit, new_data = airbnb_test)%>%
+  rmse(truth = price, estimate = .pred) %>%
+  select(.est)
+
+model_names <- c("Boosting", "Random Forest", "K-Nearest Neighbors", "Bagging")
+
+#
+all_model_rsq <- c(boost_rsq, rf_rsq, knn_rsq, bag_rsq)
+ 
+# 
+all_model_rmse <- c(boost_rmse, rf_rmse, knn_rmse, bag_rmse)
+
+all_model_results <- tibble(Model = model_names,
+                             Rsq = all_model_rsq,
+                            RMSE = all_model_rmse)
+
+all_model_results <- all_model_results %>% 
+  arrange(-all_model_rsq)
+
+all_model__results
 ```
 
 
