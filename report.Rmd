@@ -19,21 +19,29 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Introduction
 
-- Describes the data, the research questions, provides any background readers need to understand your project, etc.
+This machine learning project consists of building 4 different predictive models to find the best predictor of AirBnB Los Angeles listing prices through regression.
 
-Quarterly data for the last year for each region is available for free download on this page
-Inside Airbnb is a mission driven project that provides data and advocacy about Airbnb's impact on residential communities.
+### What is AirBnB?
 
-We work towards a vision where data and information empower communities to understand, decide and control the role of renting residential homes to tourists.
+AirBnB, standing for "Air Bed and Breakfest" is a vacational rental company that serves as an online marketplace that connects people who want to rent out their homes with people who are looking for accomodations at their preferred destinations. Travelers are able to rent a space for multiple people to share, a shared space with private rooms, or the entire property for themselves for a specific duration of days. Essentially, each listing is set at minimum price per night by the owner for their property that is caclulated into the toal pricing of their stay, which may usually include service fees, tax, etc.
 
-Los Angeles listings.csv <http://insideairbnb.com/get-the-data/>
+### Overview of the Dataset
 
+The dataset I'll be using is from "[Inside AirBnB](http://insideairbnb.com/get-the-data/)" which is a mission driven project that provides data and advocacy about Airbnb's impact on residential communities, and is specifically focused on the Los Angeles, California, U.S. region at a compile date of September 9, 2022. The dataset consists of 45,815 rows (listings) and 18 predictors that serve as the listing background information.
+
+### Our Focus
+
+With new hosts wanting to add their property for rent on the platform, a competitive and reasonable price charged per night must be established for success in renting and appealing to consumers. While this will obviously vary through factors such as market value price, the neighborhood area, or simply being within an attraction or tourist hot spot, we can use machine learning to simplify this process of predicting housing prices to utilize, using this vast dataset with thousands of previously established listings.
 
 ### Load libraries and data
+
+We first load the libraries we will be using and reading in the data, taking a look at the 18 variables.
+
 ```{r,warning=FALSE,message=FALSE, class.source = 'fold-hide'}
 # load libraries
 library(tidyverse)
 library(tidymodels)
+library(ggplot2)
 library(yardstick)
 library(corrplot)
 library(randomForest)
@@ -42,29 +50,32 @@ library(vip)
 library(rpart.plot)
 library(ranger)
 library(kernlab)
+library(kknn)
+library(baguette)
 
-# read in data
+# read in data (45)
 airbnb <- read_csv("data/unprocessed/listings.csv")
 ```
 
-
 ## Exploratory Data Analysis
 
-- at least 3 to 5 visualizations and/or tables and their interpretation/discussion
-- create a univariate visualization of the outcome(s)
-- create a bi-variate or multivariate visualization of the relationship(s) between the outcome and select predictors, etc
-- Part of an EDA involves asking questions about your data and exploring your data to find the answers.
-
-<https://www.kaggle.com/code/upadorprofzs/understand-your-data-airbnb-reservations>
+By performing EDA, we can get a better understanding of the data and ultimately help us determine the predictors that we will be including within our recipe for our response variable `price`. Specifically, I will be taking a look at the relationships price may have with the other variables. Throughout this process, I will also be cleaning the data to prevent errors that may be occurring as we run our code analysis.
 
 ### Data Cleaning
+
 ```{r}
 airbnb %>% glimpse()
 ```
 
-```{r}
-sapply(airbnb, function(x) sum(is.na(x)))
+From a general outlook, we can see that there are 11 numeric variables and 7 non-numeric variables of data type `chr`, which will help us condense our dataset into the variables we'll be prioritizing from ones that may be more irrelevant.
 
+```{r, class.source = 'fold-hide'}
+sapply(airbnb, function(x) sum(is.na(x)))
+```
+
+The variables with missing values that stick out to us are `neighbourhood_group` and `reviews_per_month`, which we'll need to manipulate the data to resolve. `neighbourhood_group`== is an important
+
+```{r}
 airbnb$reviews_per_month[is.na(airbnb$reviews_per_month)] <- 0
 
 airbnb$neighbourhood_group <- factor(airbnb$neighbourhood_group, levels = c('City of Los Angeles', 'Other Cities', 'Unincorporated Areas'))
@@ -77,42 +88,40 @@ airbnb <- airbnb %>%
   filter(price != 0) %>%
   filter(availability_365 != 0) %>%
   filter(!is.na(neighbourhood_group)) %>%
-  select(-id, -name, -host_id, -host_name, -last_review, -license) %>%
-  glimpse()
+  select(-id, -name, -host_id, -host_name, -last_review, -license)
 
 set.seed(2022)
 airbnb <- airbnb[sample(nrow(airbnb), size=15000), ]
 ```
 
-
-
-```{r}
+```{r, class.source = 'fold-hide'}
 airbnb %>%
   summary()
+```
 
+```{r, class.source = 'fold-hide'}
 # include use="pairwise.complete.obs" to exclude NAs
 corrplot(cor(Filter(is.numeric, airbnb)), method = 'color', )
+```
 
-# drop neighbourhood, latitude, longitude,
+```{r}
 # drop number_of_reviews_ltm and reviews_per_month for being highly correlated with number_of_reviews
 airbnb_clean <- airbnb %>%
-  select(-neighbourhood, -latitude, -longitude, -number_of_reviews_ltm, -reviews_per_month)
+  select(-neighbourhood, -number_of_reviews_ltm, -reviews_per_month)
 ```
 
-
-```{r}
+```{r,  warning=FALSE, message=FALSE, class.source = 'fold-hide'}
 write_rds(airbnb_clean, "data/processed/airbnb_clean.rds")
-
-# load("/data/processed/airbnb_clean.rds")
 ```
 
-```{r}
+```{r, class.source = 'fold-hide'}
+# use corrplot to make correlation of cont vars
 corrplot(cor(Filter(is.numeric, airbnb_clean)), method = 'color')
-
 ```
-For sake of faster runtime, we wil 
 
-```{r}
+For sake of faster runtime, we wil
+
+```{r, class.source = 'fold-hide'}
 NAnalysis <- airbnb_clean %>% 
   group_by(neighbourhood_group) %>% summarise(Mean_Price = mean(price))
 
@@ -123,20 +132,24 @@ ggplot(NAnalysis, aes(x = reorder(neighbourhood_group, -Mean_Price), y = Mean_Pr
         plot.subtitle = element_text(hjust = 0.5), legend.position = c(0.8, 0.5)) + xlab("") + ylab("Mean Price")
 ```
 
-
-```{r}
-# use corrplot to make correlation of cont vars
-corrplot(cor(Filter(is.numeric,airbnb_clean)), method = 'color')
+```{r, class.source = 'fold-hide'}
+ggplot(airbnb_clean, aes(x = room_type, y = price)) +
+  geom_boxplot(aes(fill = room_type)) + scale_y_log10() +
+  xlab("Room Type") + 
+  ylab("Price") +
+  ggtitle("Housing Price by Room Type") +
+  geom_hline(yintercept = mean(airbnb$price), color = "purple", linetype = 2)
 ```
 
 ## Data Splitting & Cross-validation
 
-- Describe your process of splitting data into training, test, and/or validation sets. 
+-   Describe your process of splitting data into training, test, and/or validation sets.
 
 ```{r}
 set.seed(2022)
-airbnb_split <- airbnb_clean %>% initial_split(strata = price, prop = 0.8)
-airbnb_split
+airbnb_split <- airbnb_clean %>% 
+  mutate(price = log(price)) %>%
+  initial_split(strata = price, prop = 0.8) 
 
 airbnb_train <- training(airbnb_split)
 airbnb_test <- testing(airbnb_split)
@@ -144,61 +157,49 @@ airbnb_test <- testing(airbnb_split)
 dim(airbnb_train)
 dim(airbnb_test)
 ```
+
 ```{r}
 airbnb_train %>%
   summary()
 ```
 
-
-- Describe the process of cross-validation.
+-   Describe the process of cross-validation.
 
 ### Cross Validation Folding on Training
-```{r}
+
+```{r, warning=FALSE,message=FALSE}
 set.seed(2022)
 airbnb_fold <- vfold_cv(airbnb_train, v = 10, strata = price)
 ```
 
-```{r}
-# save()
-```
-
 ## Model Fitting
 
-- Describe the types of models you fit, their parameter values, and the results.
+-   Describe the types of models you fit, their parameter values, and the results.
 
-
-Tune for: 
-  Random Forest Model, K Nearest Neighbors Model, Boosted Tree, ? SVM Model
-
-Don't tune for:
-  Ridge Regression Model, Lasso Regression Model
+Tune for: Boosting, Random Forest Model, K Nearest Neighbors Model, Bagging
 
 ### Recipe Building
 
 airbnb_train
 
-```{r}
-# airbnb_recipe <- recipe(price ~ ., data = airbnb_train) %>%
-#   step_dummy(all_nominal_predictors()) %>% 
-#   step_normalize(all_predictors())
-#   # step_center(all_predictors()) %>% 
-#   # step_scale(all_predictors())
-
+```{r, warning=FALSE,message=FALSE}
 airbnb_recipe <- recipe(price ~ . , data = airbnb_train) %>%
   step_dummy(all_nominal_predictors())
 ```
 
-
 ### xgboost model
 
-```{r}
+```{r, warning=FALSE, message=FALSE, eval=FALSE}
+
 set.seed(2022)
+
+# trees = tune(), tree_depth = 8
 boost_spec <- boost_tree(trees = tune(), 
                          tree_depth = 8) %>%
   set_engine("xgboost") %>%
   set_mode("regression")
 
-boost_grid = grid_regular(trees(range = c(10, 2000)), levels = )
+boost_grid = grid_regular(trees(range = c(10, 500)), levels = 10)
 
 boost_wf = workflow() %>%
   add_model(boost_spec) %>%
@@ -207,376 +208,252 @@ boost_wf = workflow() %>%
 boost_tune_res <- tune_grid(boost_wf,
                             resamples = airbnb_fold,
                             grid = boost_grid)
-
-autoplot(boost_tune_res)
-
-boost_tune_res_metrics = collect_metrics(boost_tune_res)
-arrange(boost_tune_res_metrics, desc(mean))
 ```
 
 
-### Random Forest Model
+```{r, class.source = 'fold-hide'}
+# save(boost_tune_res, boost_wf, boost_grid, boost_spec, file = "scripts/model_fitting/boost_model.rda")
+
+load(file='scripts/model_fitting/boost_model.rda')
+```
 
 ```{r}
+autoplot(boost_tune_res)
+```
+
+```{r}
+show_best(boost_tune_res, metric = "rsq")
+show_best(boost_tune_res, metric = "rmse")
+```
+
+```{r, warning=FALSE,message=FALSE}
+best_trees <- select_best(boost_tune_res)
+
+boost_final <- finalize_workflow(boost_wf, best_trees)
+
+boost_fit <- boost_final %>% 
+  fit(airbnb_train)
+```
+
+### Random Forest Model
+
+```{r, warning=FALSE,message=FALSE, eval=FALSE}
 set.seed(2022)
-rand_forest_spec <- rand_forest(mtry = tune(), trees = tune(), min_n = tune()) %>%
+rand_forest_spec <- rand_forest(mtry = tune(), 
+                                trees = tune(), 
+                                min_n = tune()) %>%
   set_engine("ranger", importance = 'impurity') %>%
   set_mode("regression")
-
-
 
 rand_forest_wf <- workflow() %>%
   add_model(rand_forest_spec) %>%
   add_recipe(airbnb_recipe)
 
-# rand_forest_tune_res <- tune_grid(rand_forest_wf,
-#                                   resamples = airbnb_fold,
-#                                   grid = rand_forest_grid,
-#                                   )
-
-
-
-# rf_params <- parameters(rand_forest_spec) %>% 
-#   update(mtry = mtry(range= c(2, 6)))
-# 
-# 
-# rf_grid <- grid_regular(rf_params, levels = 2)
-
-rand_forest_grid <- grid_regular(mtry(range = c(1,6)),
-                                      trees(range = c(1, 6)),
-                                 min_n(range = c(1, 6)),  # rf_params,
-                                       levels = 6)
-
+rand_forest_grid <- grid_regular(mtry(range = c(1,8)),
+                                      trees(range = c(1, 8)),
+                                 min_n(range = c(1, 8)),  
+                                       levels = 4)
 
 rf_tune <- rand_forest_wf %>% 
   tune_grid(
     resamples = airbnb_fold, 
-    # how does it complete the models in those workflows
     grid = rand_forest_grid)
+```
 
+```{r, class.source = 'fold-hide', class.source = 'fold-hide'}
+# save(rf_tune, rand_forest_wf, rand_forest_grid, rand_forest_spec, file = "scripts/model_fitting/rf_model.rda")
+load('scripts/model_fitting/rf_model.rda')
+```
 
+```{r}
 autoplot(rf_tune)
 ```
 
-```{r}
-# Save
-save(rf_tune, rand_forest_wf, rand_forest_grid, rand_forest_spec, file = "scripts/model_fitting/rf_model.rda")
-```
+
 
 ```{r}
+show_best(rf_tune, metric = "rsq")
 
-
-collect_metrics(rand_forest_tune_res, metric = ) %>%   
-  arrange(mean)
-
-show_best(rand_forest_tune_res, metric = "rsq")
-
-show_best(rand_forest_tune_res, metric = "rmse")
-
-final_rf <- rand_forest_wf %>%
-  finalize_workflow(select_best(rf_tune))
-
-final_rf
+show_best(rf_tune, metric = "rmse")
 ```
 
+```{r, warning=FALSE,message=FALSE}
+best_mtry <- select_best(rf_tune)
 
+rf_final <- finalize_workflow(rand_forest_wf, best_mtry)
+
+rf_fit <- rf_final %>% 
+  fit(airbnb_train)
+```
 
 ### K Nearest Neighbours Model
 
-```{r}
-kknn_recipe <- 
-  recipe(formula = price ~ ., data = airbnb_train) %>% 
-  step_zv(all_predictors()) %>% 
-  step_normalize(all_numeric_predictors()) 
-
-kknn_spec <- 
-  nearest_neighbor(neighbors = tune(), weight_func = tune()) %>% 
-  set_mode("classification") %>% 
-  set_engine("kknn") 
-
-kknn_workflow <- 
-  workflow() %>% 
-  add_recipe(kknn_recipe) %>% 
-  add_model(kknn_spec) 
-
-set.seed(67144)
-kknn_tune <-
-  tune_grid(kknn_workflow, resamples = stop("add your rsample object"), grid = stop("add number of candidate points"))
-```
-
-### SVM Model
-
-```{r}
-
-```
-
-### Boosted Tree
-
-```{r}
-
-```
-
-### Ridge Regression Model
-
-```{r}
-
-```
-
-### Lasso Regression Model
-
-```{r}
-
-```
-
-
-### decision tree (regression)
-
-
-```{r}
+```{r, warning=FALSE,message=FALSE, eval=FALSE}
 set.seed(2022)
-tree_spec <- decision_tree() %>%
-  set_engine("rpart")
 
-reg_tree_spec <- tree_spec %>%
-  set_mode("regression")
+knn_spec <- nearest_neighbor(
+    neighbors = tune(),
+    mode = "regression") %>% 
+  set_engine("kknn")
 
-head(airbnb_train)
+knn_wf <- workflow() %>% 
+  add_model(knn_spec) %>% 
+  add_recipe(airbnb_recipe)
 
-reg_tree_fit <- fit(reg_tree_spec, airbnb_recipe, airbnb_train)
+# set-up tuning grid ----
+knn_params <- parameters(knn_spec)
 
-augment(reg_tree_fit, new_data = airbnb_test) %>%
-  rmse(truth = price, estimate = .pred)
+# define grid
+knn_grid <- grid_regular(knn_params, levels = 8)
 
-reg_tree_fit %>%
-  extract_fit_engine() %>%
-  rpart.plot()
+knn_tune <- knn_wf %>% 
+  tune_grid(
+    # what will it fit the workflow to
+    resamples = airbnb_fold, 
+    # how does it complete the models in those workflows
+    grid = knn_grid)
+```
 
-reg_tree_wf <- workflow() %>%
-  add_model(reg_tree_spec %>% set_args(cost_complexity = tune())) %>%
-  add_formula(airbnb_recipe)
+```{r warning=FALSE,message=FALSE, class.source = 'fold-hide'}
+# save(knn_tune, knn_wf, knn_grid, knn_spec, file = "scripts/model_fitting/knn_model.rda")
+load('scripts/model_fitting/knn_model.rda')
+```
 
-param_grid <- grid_regular(cost_complexity(range = c(1, 6)), levels = 10)
+```{r}
+autoplot(knn_tune)
+```
 
-tune_res <- tune_grid(
-  reg_tree_wf, 
-  resamples = airbnb_fold, 
-  grid = param_grid
-)
+```{r}
+show_best(knn_tune, metric = "rsq")
 
-autoplot(tune_res)
+show_best(knn_tune, metric = "rmse")
+```
 
-best_complexity <- select_best(tune_res, metric = "rmse")
+```{r, warning=FALSE,message=FALSE}
+best_knn <- select_best(knn_tune)
 
-reg_tree_final <- finalize_workflow(reg_tree_wf, best_complexity)
+knn_final <- finalize_workflow(knn_wf, best_knn)
 
-reg_tree_final_fit <- fit(reg_tree_final, data = airbnb_train)
-
-reg_tree_final_fit %>%
-  extract_fit_engine() %>%
-  rpart.plot()
-
-augment(reg_tree_final_fit, new_data = ames_test) %>%
-  rmse(truth = sale_price, estimate = .pred)
-
+knn_fit <- knn_final %>% 
+  fit(airbnb_train)
 ```
 
 ### Bagging
 
-```{r}
+```{r, warning=FALSE,message=FALSE, eval=FALSE}
 set.seed(2022)
-bagging_spec <- rand_forest(mtry = .cols()) %>%
-  set_engine("randomForest", importance = TRUE) %>%
+
+bag_spec <-
+  bag_tree(
+    cost_complexity = tune(),
+    tree_depth = tune(),
+    min_n = tune()
+  ) %>%
+  set_engine("rpart", times = 10) %>%
   set_mode("regression")
 
+bag_wf <-
+  workflow() %>%
+  add_recipe(airbnb_recipe) %>%
+  add_model(bag_spec)
 
-bagging_fit <- fit(bagging_spec, airbnb_recipe, 
-                   data = airbnb_train)
+bag_params <- parameters(bag_spec)
 
-augment(bagging_fit, new_data = airbnb_test) %>%
-  rmse(truth = sale_price, estimate = .pred)
+bag_grid <- grid_regular(bag_params, levels = 4)
 
-augment(bagging_fit, new_data = airbnb_test) %>%
-  ggplot(aes(price, .pred)) +
-  geom_abline() +
-  geom_point(alpha = 0.5)
+bag_tune <- bag_wf %>% 
+  tune_grid(
+    # what will it fit the workflow to
+    resamples = airbnb_fold, 
+    # how does it complete the models in those workflows
+    grid = bag_grid)
+```
 
-vip(bagging_fit)
+```{r, warning=FALSE,message=FALSE, class.source = 'fold-hide'}
+# save(bag_tune, bag_wf, bag_grid, bag_spec, file = "scripts/model_fitting/bagging_model.rda")
+load('scripts/model_fitting/bagging_model.rda')
 ```
 
 ```{r}
-# price ~ neighbourhood(dummies) + minimum_nights + room_type(dummies) + number of reviews + reviews_per_month + calculated_host_listings_count + availability_365
-
-
-# recipe(price ~ .) %>%
-#   step_dummy(all_nominal_predictors()) %>% 
-#   step_normalize(all_predictors())
-# 
-# reg_tree_spec <- tree_spec %>%
-#   set_mode("regression")
-#   
-# reg_tree_fit <- fit(reg_tree_spec, 
-#                     sale_price ~ . -ms_sub_class -ms_zoning, ames_train)
-# 
-# augment(reg_tree_fit, new_data = ames_test) %>%
-#   rmse(truth = sale_price, estimate = .pred)
-# 
-# reg_tree_fit %>%
-#   extract_fit_engine() %>%
-#   rpart.plot()
-# 
-# reg_tree_wf <- workflow() %>%
-#   add_model(reg_tree_spec %>% set_args(cost_complexity = tune())) %>%
-#   add_formula(sale_price ~ .)
-# 
-# set.seed(3435)
-# ames_fold <- vfold_cv(ames_train)
-# 
-# param_grid <- grid_regular(cost_complexity(range = c(-4, -1)), levels = 10)
-# 
-# tune_res <- tune_grid(
-#   reg_tree_wf, 
-#   resamples = ames_fold, 
-#   grid = param_grid
-# )
-# 
-# autoplot(tune_res)
-# 
-# best_complexity <- select_best(tune_res, metric = "rmse")
-# 
-# reg_tree_final <- finalize_workflow(reg_tree_wf, best_complexity)
-# 
-# reg_tree_final_fit <- fit(reg_tree_final, data = ames_train)
-# 
-# reg_tree_final_fit %>%
-#   extract_fit_engine() %>%
-#   rpart.plot()
-# 
-# augment(reg_tree_final_fit, new_data = ames_test) %>%
-#   rmse(truth = sale_price, estimate = .pred)
-# 
-# ###
-# 
-# bagging_spec <- rand_forest(mtry = .cols()) %>%
-#   set_engine("randomForest", importance = TRUE) %>%
-#   set_mode("regression")
-# 
-# bagging_fit <- fit(bagging_spec, sale_price ~ ., 
-#                    data = ames_train)
-# 
-# augment(bagging_fit, new_data = ames_test) %>%
-#   rmse(truth = sale_price, estimate = .pred)
-# 
-# augment(bagging_fit, new_data = ames_test) %>%
-#   ggplot(aes(sale_price, .pred)) +
-#   geom_abline() +
-#   geom_point(alpha = 0.5)
-# 
-# vip(bagging_fit)
-# 
-# rf_spec <- rand_forest(mtry = 6) %>%
-#   set_engine("randomForest", importance = TRUE) %>%
-#   set_mode("regression")
-# 
-# rf_fit <- fit(rf_spec, sale_price ~ ., data = ames_train)
-# 
-# augment(rf_fit, new_data = ames_train) %>%
-#   rmse(truth = sale_price, estimate = .pred)
-# 
-# augment(rf_fit, new_data = ames_test) %>%
-#   ggplot(aes(sale_price, .pred)) +
-#   geom_abline() +
-#   geom_point(alpha = 0.5)
-# 
-# vip(rf_fit)
-# 
-# ### 
-# boost_spec <- boost_tree(trees = 5000, tree_depth = 4) %>%
-#   set_engine("xgboost") %>%
-#   set_mode("regression")
-# 
-# boost_fit <- fit(boost_spec, sale_price ~ ., data = ames_train)
-# 
-# augment(boost_fit, new_data = ames_test) %>%
-#   rmse(truth = sale_price, estimate = .pred)
+autoplot(bag_tune)
 ```
 
+```{r}
+show_best(bag_tune, metric = "rsq")
 
+show_best(bag_tune, metric = "rmse")
+```
+
+```{r, warning=FALSE,message=FALSE}
+best_cost <- select_best(bag_tune)
+
+bag_final <- finalize_workflow(bag_wf, best_cost)
+
+bag_fit <- bag_final %>% 
+  fit(airbnb_train)
+```
 
 ## Model Selection & Performance
 
-- A table and/or graph describing the performance of your best-fitting model on testing data. 
-- Describe your best-fitting model however you choose, and the quality of its predictions, etc.
+-   A table and/or graph describing the performance of your best-fitting model on testing data.
+-   Describe your best-fitting model however you choose, and the quality of its predictions, etc.
+
+```{r, warning=FALSE,message=FALSE, class.source = 'fold-hide'}
+boost_rsq <- augment(boost_fit, new_data = airbnb_test)%>%
+  rsq(truth = price, estimate = .pred) 
+
+boost_rmse <- augment(boost_fit, new_data = airbnb_test)%>%
+  rmse(truth = price, estimate = .pred) 
+
+rf_rsq <- augment(rf_fit, new_data = airbnb_test)%>%
+  rsq(truth = price, estimate = .pred)
+
+rf_rmse <- augment(rf_fit, new_data = airbnb_test)%>%
+  rmse(truth = price, estimate = .pred)
+
+knn_rsq <- augment(knn_fit, new_data = airbnb_test)%>%
+  rsq(truth = price, estimate = .pred)
+
+knn_rmse <- augment(knn_fit, new_data = airbnb_test)%>%
+  rmse(truth = price, estimate = .pred)
+
+bag_rsq <- augment(bag_fit, new_data = airbnb_test)%>%
+  rsq(truth = price, estimate = .pred)
+
+bag_rmse <- augment(bag_fit, new_data = airbnb_test)%>%
+  rmse(truth = price, estimate = .pred)
+
+model_names <- c("Boosting", "Random Forest", "K-Nearest Neighbors", "Bagging")
+
+#
+all_model_rsq <- c(boost_rsq$.estimate, rf_rsq$.estimate, knn_rsq$.estimate, bag_rsq$.estimate)
+ 
+# 
+all_model_rmse <- c(boost_rmse$.estimate, rf_rmse$.estimate, knn_rmse$.estimate, bag_rmse$.estimate)
+
+all_model_results <- tibble(Model = model_names,
+                             Rsq = all_model_rsq,
+                            RMSE = all_model_rmse)
+```
+
+```{r}
+all_model_results %>%
+  arrange(desc(Rsq))
+```
+
+```{r, class.source = 'fold-hide'}
+augment(boost_fit, new_data = airbnb_test) %>%
+  ggplot(aes(price, .pred)) +
+  geom_abline() +
+  geom_point(alpha = 0.5)
+```
 
 ## Conclusion
 
-- Discusses the outcome(s) of models you fit. 
-- Which models performed well, which performed poorly? 
-- Were you surprised by model performance? 
-- Next steps? 
-- General conclusions?
+-   Discusses the outcome(s) of models you fit.
+-   Which models performed well, which performed poorly?
+-   Were you surprised by model performance?
+-   Next steps?
+-   General conclusions?
 
-
-
-
-
-
-
-=======
-
-## References
-
-```{r}
-# library(tidymodels)
-# library(ISLR)
-# library(ISLR2)
-# library(tidyverse)
-# library(glmnet)
-# library(janitor)
-# tidymodels_prefer()
-# 
-# 
-# Hitters <- as_tibble(Hitters) %>%
-#   filter(!is.na(Salary))
-# 
-# Hitters
-# 
-# Hitters %>% select(Division) %>% table()
-# 
-# Hitters %>% select(League) %>% table()
-# 
-# data(ames, package = "modeldata")
-# 
-# ames <- as_tibble(ames) %>% 
-#   clean_names()
-# 
-# ames
-```
-
-
-### Tabset Reference {.tabset}
-
-#### Test 1
-
-Text 1
-
-#### Test 2
-
-Text 2
-
-#### Test 3
-
-Text 3
-
-### Chunk code-fold show / code-fold hide
-
-```{r,warning=FALSE,message=FALSE, class.source = 'fold-hide'}
-# load libraries
-library(tidyverse)
-library(tidymodels)
-```
-
-```{r,warning=FALSE,message=FALSE, class.source = 'fold-show'}
-# load libraries
-library(tidyverse)
-library(tidymodels)
-```
+If I were to do this again, I would include the "names" variable, which is the title the hosts manually input for their listings, to tokenize and see if certain words or phrases may correlate to the prices (e.g. "luxury" or "mansion" which may have more expensive values).
