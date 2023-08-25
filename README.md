@@ -1,2 +1,2 @@
-# PSTAT-131-Final-Project
-AirBNB price prediction
+# AirBnB Housing Price Prediction
+
