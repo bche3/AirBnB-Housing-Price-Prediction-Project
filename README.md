@@ -44,7 +44,8 @@ Predicted housing prices on Airbnb Los Angeles houses dataset by training and be
 
 Our variables of focus:
 
-- `General_2020` — 
+- `id` —
+- `id` — 
 
 ## Results and Evaluation
 Desc
@@ -52,8 +53,6 @@ Desc
 ## Future Work
 Desc
 
-## Acknowledgments/References
-- 
 
 <!--
 ## Code structure
