@@ -11,7 +11,7 @@
 ![codesize](https://img.shields.io/github/languages/code-size/pragyy/datascience-readme-template) 
 -->
 
-![img](https://github.com/bche3/AirBnB-Housing-Price-Prediction-Project/blob/main/img/project-thumbnail.jpg)
+![img](https://github.com/bche3/AirBnB-Housing-Price-Prediction-Project/blob/main/images/airbnb-thumbnail.png)
 
 ## Project Overview
 
