@@ -30,7 +30,10 @@ Predicted housing prices on Airbnb Los Angeles houses dataset by training and be
 ## Data
 
 ### Source Data
-- 
+- http://insideairbnb.com/get-the-data/
+  - Inside Airbnb is a mission driven project that provides data and advocacy about Airbnb's impact on residential communities. We work towards a vision where data and information empower communities to understand, decide and control the role of renting residential homes to tourists.
+- http://data.insideairbnb.com/united-states/ca/los-angeles/2022-09-09/visualisations/listings.csv
+  - 	Summary information and metrics for listings in Los Angeles (good for visualisations). 
 
 ### Data Acquisition
 - 
