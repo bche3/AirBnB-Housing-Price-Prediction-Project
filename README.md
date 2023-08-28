@@ -1,6 +1,6 @@
 # AirBnB Housing Price Prediction Project
 
-> R,
+> R, Random Forest, XGBoost, K-Nearest Neighbors (KNN)
 
 <!--
 ![GitHub release (latest by date including pre-releases)](https://img.shields.io/github/v/release/pragyy/datascience-readme-template?include_prereleases)
@@ -15,15 +15,15 @@
 
 ## Project Overview
 
-Description
+Predicted housing prices on Airbnb Los Angeles houses dataset by training and benchmarking machine learning models including Random Forest, K-Nearest Neighbors (KNN) in R (random forest, xgboost, knn). I performed log-transformation, stratified cross validation, and hyperparameter tuning on models; yielded 63% R-squared and 54% RMSE on best performing model using Bagging
 
 ## Installation and Setup
 - **Technologies:**  R Studio
-- **R Version:** 3.10.10
+- **R Version:** 4.2.2
 - **Packages Used:**
-  - **Data Manipulation:** 
-  - **Data Visualization:** 
-  - **Machine Learning:** 
+  - **Data Manipulation:** tidyverse, tidymodels
+  - **Data Visualization:** ggplot2, yardstick, corrplot, rpart.plot
+  - **Machine Learning:** randomForest, xgboost, vip, ranger, kernlab, kknn, baguette
 <!-- - **General Purpose:** General purpose packages like `urllib, os, request`, and many more. -->
 
 
